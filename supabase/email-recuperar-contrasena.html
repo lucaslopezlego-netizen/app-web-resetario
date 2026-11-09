@@ -1,0 +1,84 @@
+<!--
+  Eco Menú — Plantilla del correo "Reset Password" (recuperar contraseña) para Supabase.
+  Dónde pegarla: Supabase → Authentication → Emails → Templates → Reset Password.
+    Subject:  Tu código para restablecer la contraseña de Eco Menú
+    Body:     todo el contenido de este archivo (puedes dejar este comentario).
+  {{ .Token }} es el código que Supabase genera. {{ .Email }} es el correo de la persona.
+  Estilos en línea y tablas: así se ve bien en Gmail, Outlook y Apple Mail.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light only" />
+  <title>Tu código de Eco Menú</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4ece1;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Tu código para restablecer la contraseña es {{ .Token }}. Vence en 1 hora.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4ece1;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:480px;">
+
+          <!-- Encabezado -->
+          <tr>
+            <td style="background-color:#1e140e;border-radius:20px 20px 0 0;padding:28px 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="width:34px;height:34px;border-radius:17px;border:2px solid #e8b27a;" aria-hidden="true">&nbsp;</td>
+                  <td style="padding-left:12px;font-family:Georgia,'Times New Roman',serif;font-size:24px;color:#f6ebdd;">
+                    Eco <span style="color:#e8b27a;">Menú</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Cuerpo -->
+          <tr>
+            <td style="background-color:#fffaf3;padding:32px;font-family:Helvetica,Arial,sans-serif;color:#26180f;">
+              <h1 style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:26px;line-height:1.2;color:#26180f;">
+                Restablece tu contraseña
+              </h1>
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#6d5848;">
+                Recibimos una solicitud para cambiar la contraseña de la cuenta <strong style="color:#26180f;">{{ .Email }}</strong>.
+                Copia este código y pégalo en Eco Menú:
+              </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center" style="background-color:#f3e1cc;border-radius:14px;padding:22px 12px;">
+                    <div style="font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:bold;letter-spacing:10px;color:#5b3a22;">{{ .Token }}</div>
+                    <div style="margin-top:8px;font-size:12px;color:#6d5848;">Vence en 1 hora · solo sirve una vez</div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:24px 0 8px;font-size:14px;font-weight:bold;color:#26180f;">Cómo usarlo</p>
+              <ol style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.7;color:#6d5848;">
+                <li>Vuelve a Eco Menú, donde pediste el código.</li>
+                <li>Pega el código en el recuadro y pulsa <strong style="color:#26180f;">Verificar código</strong>.</li>
+                <li>Escribe tu nueva contraseña y pulsa <strong style="color:#26180f;">Guardar contraseña y entrar</strong>.</li>
+              </ol>
+
+              <p style="margin:0;padding:14px 16px;border-radius:12px;background-color:#fdf3e7;font-size:13px;line-height:1.6;color:#6d5848;">
+                ¿No lo pediste tú? Ignora este correo: tu contraseña no cambia y nadie puede usar este código sin tu correo.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Pie -->
+          <tr>
+            <td style="background-color:#fffaf3;border-top:1px dashed #e3d3bf;border-radius:0 0 20px 20px;padding:18px 32px 26px;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a8574;text-align:center;">
+              Eco Menú · Cocina inteligente por presupuesto<br />
+              Este es un correo automático, no hace falta responderlo.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -952,6 +952,10 @@
   function fijarModoAuth(modo) {
     modoAuth = modo;
     const crear = modo === "crear";
+    $("#recuperar").hidden = true;
+    $("#formAuth").hidden = false;
+    $(".auth-tabs").hidden = false;
+    $("#olvideClave").hidden = crear;
     $("#authTitulo").textContent = crear ? "Crear cuenta" : "Iniciar sesión";
     $("#tabCrear").setAttribute("aria-selected", String(crear));
     $("#tabEntrar").setAttribute("aria-selected", String(!crear));
@@ -981,6 +985,195 @@
   });
   $$(".auth-tabs [data-modo]").forEach((t) => t.addEventListener("click", () => fijarModoAuth(t.dataset.modo)));
   $("#cerrarAuth").addEventListener("click", () => dlgAuth.close());
+
+  /* ---------------- Recuperar contraseña: correo → código → nueva contraseña ---------------- */
+  const rec = { paso: 1, correo: "", completado: false, espera: 0, timer: null };
+
+  function recEstado(msg = "", tipo = "error") {
+    const el = $("#recEstado");
+    el.textContent = msg;
+    el.className = `form-status ${tipo}`;
+    el.hidden = !msg;
+  }
+
+  function irRec(n) {
+    rec.paso = n;
+    $$("#recuperar [data-rec-paso]").forEach((f) => { f.hidden = Number(f.dataset.recPaso) !== n; });
+    $$(".recover-steps li").forEach((li) => {
+      const k = Number(li.dataset.rec);
+      if (k === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+      li.classList.toggle("hecho", k < n);
+    });
+    $$("#recuperar [aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+    recEstado("");
+    const foco = { 1: "#recCorreo", 2: "#recCodigo", 3: "#recClave" }[n];
+    setTimeout(() => $(foco)?.focus(), 50);
+  }
+
+  function abrirRecuperacion(paso = 1) {
+    $("#formAuth").hidden = true;
+    $(".auth-tabs").hidden = true;
+    $("#recuperar").hidden = false;
+    $("#authTitulo").textContent = "Recuperar contraseña";
+    rec.completado = false;
+    if (paso === 1) $("#recCorreo").value = rec.correo || $("#authCorreo").value.trim();
+    irRec(paso);
+  }
+
+  function marcarInvalido(sel, msg, tipo) {
+    recEstado(msg, tipo);
+    if (sel && tipo !== "info") { $(sel).setAttribute("aria-invalid", "true"); $(sel).focus(); }
+  }
+
+  /** Cuenta regresiva para "Reenviar código" (Supabase permite un correo por minuto). */
+  function esperarReenvio(seg = 60) {
+    clearInterval(rec.timer);
+    rec.espera = seg;
+    const btn = $("#recReenviar");
+    const pintar = () => {
+      btn.disabled = rec.espera > 0;
+      btn.textContent = rec.espera > 0 ? `Reenviar código en ${rec.espera} s` : "Reenviar código";
+    };
+    pintar();
+    rec.timer = setInterval(() => { rec.espera -= 1; pintar(); if (rec.espera <= 0) clearInterval(rec.timer); }, 1000);
+  }
+
+  async function enviarCodigo(boton) {
+    const correo = $("#recCorreo").value.trim();
+    const texto = boton.textContent;
+    boton.disabled = true; boton.textContent = "Enviando…";
+    try {
+      await EcoCuentas.preparar();
+      await EcoCuentas.enviarCodigo(correo);
+      rec.correo = correo.toLowerCase();
+      $("#recCorreoTxt").textContent = rec.correo;
+      $("#recCodigo").value = "";
+      $("#recCodigo").classList.remove("ok");
+      irRec(2);
+      recEstado("Código enviado. Puede tardar un minuto en llegar.", "info");
+      esperarReenvio(60);
+    } catch (ex) {
+      if (rec.paso === 1) marcarInvalido(ex.campo === "correo" ? "#recCorreo" : null, ex.message, ex.tipo);
+      else recEstado(ex.message, ex.tipo === "info" ? "info" : "error");
+    } finally {
+      boton.disabled = boton.id === "recReenviar" ? rec.espera > 0 : false;
+      if (boton.id !== "recReenviar") boton.textContent = texto;
+    }
+  }
+
+  // Al escribir, se quita la marca de error del campo y el aviso.
+  $("#recuperar").addEventListener("input", (e) => {
+    if (e.target.matches("input")) { e.target.removeAttribute("aria-invalid"); if (!$("#recEstado").classList.contains("info")) recEstado(""); }
+  });
+  $("#olvideClave").addEventListener("click", () => abrirRecuperacion(1));
+  $("#recVolver").addEventListener("click", () => { fijarModoAuth("entrar"); if (rec.correo) $("#authCorreo").value = rec.correo; $("#authClave").focus(); });
+  $("#recOtroCorreo").addEventListener("click", () => irRec(1));
+  $("#formRecCorreo").addEventListener("submit", (e) => { e.preventDefault(); enviarCodigo($("#recEnviar")); });
+  $("#recReenviar").addEventListener("click", (e) => enviarCodigo(e.currentTarget));
+
+  const soloDigitos = (t) => String(t || "").replace(/\D/g, "").slice(0, 10);
+
+  async function verificarCodigo() {
+    const codigo = soloDigitos($("#recCodigo").value);
+    const btn = $("#recVerificar");
+    btn.disabled = true; btn.textContent = "Verificando…";
+    try {
+      await EcoCuentas.verificarCodigo(rec.correo, codigo);
+      $("#recCodigo").classList.add("ok");
+      irRec(3);
+    } catch (ex) {
+      marcarInvalido("#recCodigo", ex.message, ex.tipo);
+    } finally {
+      btn.disabled = false; btn.textContent = "Verificar código";
+    }
+  }
+
+  $("#formRecCodigo").addEventListener("submit", (e) => { e.preventDefault(); verificarCodigo(); });
+  $("#recCodigo").addEventListener("input", (e) => {
+    const limpio = soloDigitos(e.target.value);
+    if (e.target.value !== limpio) e.target.value = limpio;
+    e.target.removeAttribute("aria-invalid");
+  });
+  // Pegar con Cmd/Ctrl+V o "Pegar" del teclado del celular: se limpian espacios y se verifica solo.
+  $("#recCodigo").addEventListener("paste", (e) => {
+    const t = soloDigitos(e.clipboardData?.getData("text"));
+    if (t.length >= 6) { e.preventDefault(); $("#recCodigo").value = t; verificarCodigo(); }
+  });
+  $("#pegarCodigo").addEventListener("click", async () => {
+    try {
+      const t = soloDigitos(await navigator.clipboard.readText());
+      if (t.length < 6) { recEstado("No encontramos un código en lo que copiaste. Copia los números del correo.", "info"); return; }
+      $("#recCodigo").value = t;
+      verificarCodigo();
+    } catch {
+      $("#recCodigo").focus();
+      recEstado("Tu navegador no deja pegar con el botón. Mantén presionado el recuadro y elige «Pegar».", "info");
+    }
+  });
+
+  function fuerzaClave(c) {
+    let p = 0;
+    if (c.length >= 6) p++;
+    if (c.length >= 10) p++;
+    if (/[a-z]/i.test(c) && /\d/.test(c)) p++;
+    if (/[^a-z0-9]/i.test(c) || (/[a-z]/.test(c) && /[A-Z]/.test(c))) p++;
+    return p;
+  }
+  $("#recClave").addEventListener("input", (e) => {
+    const c = e.target.value, p = fuerzaClave(c);
+    const niveles = [
+      ["8%", "var(--danger)", "Muy corta: usa al menos 6 caracteres."],
+      ["30%", "var(--danger)", "Débil: agrega números o hazla más larga."],
+      ["55%", "var(--warn)", "Aceptable."],
+      ["80%", "var(--ok)", "Buena."],
+      ["100%", "var(--ok)", "Muy buena."]
+    ];
+    const [ancho, color, txt] = c ? niveles[p] : ["0", "transparent", "Usa al menos 6 caracteres. Mejor si mezclas letras y números."];
+    const bar = $("#recFuerza"); bar.style.width = ancho; bar.style.background = color;
+    $("#recFuerzaTxt").textContent = txt;
+  });
+  $("#recVerClave").addEventListener("click", () => {
+    const ver = $("#recClave").type === "password";
+    ["#recClave", "#recClave2"].forEach((s2) => { $(s2).type = ver ? "text" : "password"; });
+    $("#recVerClave").textContent = ver ? "Ocultar" : "Mostrar";
+  });
+
+  $("#formRecClave").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const c1 = $("#recClave").value, c2 = $("#recClave2").value;
+    if (c1.length < 6) return marcarInvalido("#recClave", "La contraseña debe tener al menos 6 caracteres.");
+    if (c1 !== c2) return marcarInvalido("#recClave2", "Las dos contraseñas no coinciden.");
+    const btn = $("#recGuardar");
+    btn.disabled = true; btn.textContent = "Guardando…";
+    try {
+      const u = await EcoCuentas.nuevaClave(c1);
+      rec.completado = true;
+      btn.textContent = "Cargando tus menús…";
+      await EcoCuentas.sincronizar();
+      dlgAuth.close();
+      ["#recClave", "#recClave2", "#recCodigo"].forEach((s2) => { $(s2).value = ""; });
+      entrarComo(u);
+      toast(`Contraseña actualizada. Hola de nuevo, ${u.nombre.split(" ")[0]}.`);
+      $("#planificador").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (ex) {
+      marcarInvalido(ex.campo === "clave" ? "#recClave" : null, ex.message, ex.tipo);
+    } finally {
+      btn.disabled = false; btn.textContent = "Guardar contraseña y entrar";
+    }
+  });
+
+  // Si cierra la ventana con el código verificado pero sin guardar la contraseña, se cierra esa sesión temporal.
+  dlgAuth.addEventListener("close", () => {
+    clearInterval(rec.timer);
+    if (rec.paso === 3 && !rec.completado && !$("#recuperar").hidden && !state.usuario) EcoCuentas.salir().catch(() => {});
+  });
+
+  // Si llega desde el enlace de un correo de recuperación (plantilla con enlace), se pide la nueva contraseña.
+  EcoCuentas.onRecuperacion((u) => {
+    rec.correo = u?.correo || "";
+    if (!dlgAuth.open) dlgAuth.showModal();
+    abrirRecuperacion(3);
+  });
   $("#verClave").addEventListener("click", () => {
     const ver = $("#authClave").type === "password";
     $("#authClave").type = ver ? "text" : "password";

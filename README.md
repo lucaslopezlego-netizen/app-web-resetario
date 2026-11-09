@@ -52,7 +52,8 @@ Sin configurar nada, las cuentas se guardan solo en el navegador de cada disposi
    - **Con Vercel (recomendado):** conecta Supabase a tu proyecto de Vercel con la integración oficial. Crea solas las variables `SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`, y la app las lee desde `/api/config` (`api/config.js`), que nunca entrega la clave `service_role`. Después de conectar, vuelve a desplegar.
    - **Sin Vercel:** pega **Project URL** y la clave **anon public** en `js/supabase-config.js`. Son valores públicos por diseño; nunca uses la clave `service_role`.
 4. En **Authentication → URL Configuration**, pon en **Site URL** la dirección donde publiques la app (por ejemplo la de Vercel), para que funcione el enlace del correo de confirmación.
-5. Opcional: si no quieres que se pida confirmar el correo, desactiva **Authentication → Providers → Email → Confirm email**.
+5. Para entrar sin verificar el correo al registrarse, desactiva **Authentication → Providers → Email → Confirm email**.
+6. **Recuperar contraseña con código:** en **Authentication → Emails → Templates → Reset Password**, pon como asunto *Tu código para restablecer la contraseña de Eco Menú* y pega el contenido de `supabase/email-recuperar-contrasena.html`. El correo muestra el código (`{{ .Token }}`). En la app: **Iniciar sesión → ¿Olvidaste tu contraseña?** → correo → pegar el código → nueva contraseña.
 
 Con Supabase activo:
 - La sesión la guarda Supabase en el navegador y se renueva sola; queda abierta hasta pulsar **Cerrar sesión**.
@@ -74,6 +75,7 @@ js/cuentas.js           Cuentas (Supabase o locales), sesión y sincronización 
 js/supabase-config.js   URL y clave pública de tu proyecto de Supabase
 js/vendor/              Librería oficial supabase-js 2.45.4 (MIT)
 supabase/schema.sql     Tablas y reglas de seguridad para Supabase
+supabase/email-recuperar-contrasena.html  Plantilla del correo con el código de recuperación
 js/demo.js              Recetas de ejemplo sin IA
 js/app.js               Lógica de la interfaz
 js/config.example.js    Plantilla de configuración local

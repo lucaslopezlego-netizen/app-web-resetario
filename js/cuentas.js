@@ -41,7 +41,7 @@ const EcoCuentas = (() => {
   }
 
   /* ---------------- Copia local por usuario ---------------- */
-  const listeners = { estado: [], salida: [] };
+  const listeners = { estado: [], salida: [], recuperacion: [] };
   const emitir = (tipo, v) => listeners[tipo].forEach((f) => { try { f(v); } catch (e) { console.error(e); } });
 
   function almacenLocal(id, alCambiar) {
@@ -106,6 +106,11 @@ const EcoCuentas = (() => {
     },
 
     async salir() { borrar(K_SESION); },
+    async enviarCodigo() {
+      throw new ErrorCuenta("En este dispositivo las cuentas no están en la nube, así que no podemos enviarte un correo. Crea una cuenta nueva con otro correo.", "correo");
+    },
+    async verificarCodigo() { throw new ErrorCuenta("La recuperación por correo no está disponible."); },
+    async nuevaClave() { throw new ErrorCuenta("La recuperación por correo no está disponible."); },
     async sincronizar() { /* nada que sincronizar */ },
     almacen: (id) => almacenLocal(id)
   };
@@ -126,6 +131,14 @@ const EcoCuentas = (() => {
     if (m.includes("password should be") || m.includes("weak password")) return new ErrorCuenta("La contraseña es muy débil. Usa al menos 6 caracteres, mezclando letras y números.", "clave");
     if (m.includes("invalid email") || m.includes("unable to validate email")) return new ErrorCuenta("Ese correo no es válido.", "correo");
     if (m.includes("rate limit") || m.includes("too many")) return new ErrorCuenta("Demasiados intentos. Espera un minuto y vuelve a intentarlo.");
+    if (m.includes("token has expired") || m.includes("otp_expired") || m.includes("invalid otp") || m.includes("token is invalid"))
+      return new ErrorCuenta("El código no es correcto o ya venció. Revisa el último correo que te llegó o pide uno nuevo.", "codigo");
+    if (m.includes("should be different") || m.includes("same_password"))
+      return new ErrorCuenta("La nueva contraseña debe ser distinta de la anterior.", "clave");
+    const espera = m.match(/after (\d+) seconds?/);
+    if (espera) return new ErrorCuenta(`Por seguridad, espera ${espera[1]} segundos antes de pedir otro código.`, null, "info");
+    if (m.includes("email rate limit") || m.includes("over_email_send_rate_limit"))
+      return new ErrorCuenta("Se enviaron demasiados correos en poco tiempo. Espera unos minutos y vuelve a intentarlo.", null, "info");
     if (m.includes("failed to fetch") || m.includes("network")) return new ErrorCuenta("No hay conexión con el servidor de cuentas. Revisa tu internet.");
     return new ErrorCuenta(err?.message || "No se pudo completar. Vuelve a intentarlo.");
   }
@@ -240,6 +253,7 @@ const EcoCuentas = (() => {
         });
         sb.auth.onAuthStateChange((evento, sesion) => {
           if (evento === "SIGNED_OUT" && usuarioSb) { usuarioSb = null; emitir("salida"); }
+          if (evento === "PASSWORD_RECOVERY" && sesion?.user) { usuarioSb = sesion.user; emitir("recuperacion", desdeSb(sesion.user)); }
           if (sesion?.user && usuarioSb && sesion.user.id === usuarioSb.id) usuarioSb = sesion.user;
         });
       }
@@ -285,6 +299,33 @@ const EcoCuentas = (() => {
       usuarioSb = null; sync.subidos = new Map(); sync.pendientes.clear();
       try { await nube.cliente().auth.signOut(); } catch { /* sin conexión: la sesión local se borra igual */ }
       if (id) ["datos", "actual", "menus", "subidos"].forEach((k) => borrar(`eco.u.${id}.${k}`));
+    },
+
+    /** Paso 1 de recuperación: Supabase envía el correo con el código ({{ .Token }} en la plantilla "Reset Password"). */
+    async enviarCodigo(correo) {
+      correo = normCorreo(correo);
+      if (!correoValido(correo)) throw new ErrorCuenta("Escribe un correo válido, por ejemplo ana@correo.com.", "correo");
+      const { error } = await nube.cliente().auth.resetPasswordForEmail(correo, { redirectTo: location.origin + location.pathname });
+      if (error) throw traducir(error);
+    },
+
+    /** Paso 2: el código del correo abre una sesión temporal de recuperación. */
+    async verificarCodigo(correo, codigo) {
+      const token = String(codigo || "").replace(/\D/g, "");
+      if (token.length < 6) throw new ErrorCuenta("El código tiene al menos 6 números. Revísalo en tu correo.", "codigo");
+      const { data, error } = await nube.cliente().auth.verifyOtp({ email: normCorreo(correo), token, type: "recovery" });
+      if (error) throw traducir(error);
+      usuarioSb = data.user || data.session?.user || null;
+      return desdeSb(usuarioSb);
+    },
+
+    /** Paso 3: guarda la nueva contraseña con la sesión de recuperación. */
+    async nuevaClave(clave) {
+      if (String(clave || "").length < 6) throw new ErrorCuenta("La contraseña debe tener al menos 6 caracteres.", "clave");
+      const { data, error } = await nube.cliente().auth.updateUser({ password: clave });
+      if (error) throw traducir(error);
+      usuarioSb = data.user || usuarioSb;
+      return desdeSb(usuarioSb);
     },
 
     sincronizar: bajar,
@@ -342,6 +383,11 @@ const EcoCuentas = (() => {
     onEstado: (f) => listeners.estado.push(f),
     /** Se llama si la sesión se cierra desde otra pestaña o expira. */
     onSalida: (f) => listeners.salida.push(f),
+    /** Se llama si la persona llega desde el enlace de un correo de recuperación. */
+    onRecuperacion: (f) => listeners.recuperacion.push(f),
+    enviarCodigo: (c) => motor.enviarCodigo(c),
+    verificarCodigo: (c, t) => motor.verificarCodigo(c, t),
+    nuevaClave: (c) => motor.nuevaClave(c),
     ErrorCuenta
   };
 })();

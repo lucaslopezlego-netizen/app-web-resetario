@@ -386,11 +386,71 @@
             <input type="password" id="authClave" autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" />
             <button type="button" class="btn btn-quiet btn-sm" id="verClave">Mostrar</button>
           </div>
+          <button type="button" class="link-btn olvide" id="olvideClave" hidden>¿Olvidaste tu contraseña?</button>
         </div>
         <p class="form-status error" id="authError" role="alert" hidden></p>
         <button type="submit" class="btn btn-primary btn-block" id="authEnviar">Crear cuenta</button>
         <p class="hint" id="authNota">La cuenta y la sesión se guardan en este dispositivo.</p>
       </form>
+
+      <!-- Recuperar contraseña: correo → código → nueva contraseña -->
+      <div class="recover" id="recuperar" hidden>
+        <ol class="recover-steps" aria-label="Pasos para recuperar la contraseña">
+          <li data-rec="1" aria-current="step"><span>1</span>Correo</li>
+          <li data-rec="2"><span>2</span>Código</li>
+          <li data-rec="3"><span>3</span>Nueva contraseña</li>
+        </ol>
+
+        <form class="auth-form" id="formRecCorreo" data-rec-paso="1" novalidate>
+          <p class="recover-text">Escribe el correo de tu cuenta. Te enviaremos un código para crear una contraseña nueva.</p>
+          <div class="field">
+            <label class="label-strong" for="recCorreo">Correo</label>
+            <input type="email" id="recCorreo" autocomplete="email" inputmode="email" placeholder="tu@correo.com" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="recEnviar">Enviar código</button>
+        </form>
+
+        <form class="auth-form" id="formRecCodigo" data-rec-paso="2" novalidate hidden>
+          <div class="recover-mail" aria-hidden="true">
+            <svg viewBox="0 0 48 48"><rect x="6" y="11" width="36" height="26" rx="4"/><path d="M7 13l17 13 17-13"/></svg>
+          </div>
+          <p class="recover-text">Te enviamos un código a <b id="recCorreoTxt"></b>. Cópialo del correo y pégalo aquí.</p>
+          <div class="field">
+            <label class="label-strong" for="recCodigo">Código de verificación</label>
+            <div class="code-row">
+              <input type="text" id="recCodigo" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="000000" spellcheck="false" />
+              <button type="button" class="btn btn-quiet" id="pegarCodigo">Pegar</button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="recVerificar">Verificar código</button>
+          <div class="recover-links">
+            <button type="button" class="link-btn" id="recReenviar">Reenviar código</button>
+            <button type="button" class="link-btn" id="recOtroCorreo">Usar otro correo</button>
+          </div>
+          <p class="hint">¿No llega? Revisa Spam o Promociones. El código vence en 1 hora y solo sirve una vez.</p>
+        </form>
+
+        <form class="auth-form" id="formRecClave" data-rec-paso="3" novalidate hidden>
+          <p class="recover-text">Código correcto. Ahora elige tu nueva contraseña.</p>
+          <div class="field">
+            <label class="label-strong" for="recClave">Nueva contraseña</label>
+            <div class="key-row">
+              <input type="password" id="recClave" autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" />
+              <button type="button" class="btn btn-quiet btn-sm" id="recVerClave">Mostrar</button>
+            </div>
+            <div class="strength" aria-hidden="true"><span id="recFuerza"></span></div>
+            <p class="hint" id="recFuerzaTxt">Usa al menos 6 caracteres. Mejor si mezclas letras y números.</p>
+          </div>
+          <div class="field">
+            <label class="label-strong" for="recClave2">Repite la contraseña</label>
+            <input type="password" id="recClave2" autocomplete="new-password" placeholder="Escríbela otra vez" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="recGuardar">Guardar contraseña y entrar</button>
+        </form>
+
+        <p class="form-status" id="recEstado" role="alert" hidden></p>
+        <button type="button" class="link-btn recover-back" id="recVolver">Volver a iniciar sesión</button>
+      </div>
     </div>
   </dialog>
 
