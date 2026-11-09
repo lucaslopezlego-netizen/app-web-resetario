@@ -1,8 +1,8 @@
 /**
  * EcoMenú IA — Lógica de la interfaz.
  * Asistente de 5 pasos → generación con Gemini (directa, vía servidor o demo)
- * → resultados interactivos: días con foto, "lo tengo en casa", cambiar plato,
- *   modo cocina con temporizador y ticket de compras.
+ * → resultados: cada día con desayuno, almuerzo y/o cena; "ya lo tengo en casa",
+ *   cambiar una receta, modo cocina con temporizador y lista de compras por pasillo.
  */
 (() => {
   "use strict";
@@ -19,33 +19,38 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } },
     del(k) { try { localStorage.removeItem(k); } catch { /* sin almacenamiento */ } }
   };
-  const K = { datos: "eco.datos", plan: "eco.plan", key: "eco.key", modelo: "eco.modelo", demo: "eco.demo" };
+  const K = { datos: "eco.datos", plan: "eco.plan2", key: "eco.key", modelo: "eco.modelo", demo: "eco.demo" };
 
   const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  const COMIDAS = core.COMIDAS; // ["desayuno", "almuerzo", "cena"]
+  const ETIQUETA = { desayuno: "Desayuno", almuerzo: "Almuerzo", cena: "Cena" };
   /** Tipos de cambio aproximados a USD, solo para orientar el indicador del paso 1. */
   const A_USD = { USD: 1, EUR: 1.08, MXN: 0.055, ARS: 0.001, COP: 0.00025, CLP: 0.00105, PEN: 0.27, BOB: 0.145, UYU: 0.025, GTQ: 0.13, DOP: 0.016 };
   const MENSAJES_CARGA = [
     "Revisando precios del mercado…", "Comparando el kilo de arroz y de lentejas…", "Descartando ingredientes con alérgenos…",
-    "Buscando platos que reutilicen ingredientes…", "Ajustando cantidades por persona…", "Calculando el costo de cada receta…",
-    "Escribiendo los pasos de preparación…", "Sumando la lista de compras…"
+    "Repartiendo el presupuesto entre las comidas…", "Buscando platos que reutilicen ingredientes…", "Ajustando cantidades por persona…",
+    "Calculando el costo de cada receta…", "Escribiendo los pasos de preparación…", "Ordenando la lista de compras…"
   ];
 
   function dinero(v, moneda) {
     try { return new Intl.NumberFormat("es", { style: "currency", currency: moneda, maximumFractionDigits: 2 }).format(v); }
     catch { return `${moneda} ${num(v).toFixed(2)}`; }
   }
+  const listaNatural = (arr) => arr.length > 1 ? `${arr.slice(0, -1).join(", ")} y ${arr[arr.length - 1]}` : (arr[0] || "");
 
   /* ================================================================== */
   /* Estado                                                              */
   /* ================================================================== */
-  const datosIniciales = { presupuesto: 40, moneda: "USD", dias: 3, personas: 2, comida: "almuerzo", gustos: [], alergias: [], notas: "" };
+  const datosIniciales = { presupuesto: 40, moneda: "USD", dias: 3, personas: 2, comidas: ["almuerzo"], gustos: [], alergias: [], notas: "" };
+  const guardados = store.get(K.datos) || {};
   const state = {
     paso: 1, maxPaso: 1,
-    datos: { ...datosIniciales, ...(store.get(K.datos) || {}) },
-    plan: null, diaSel: 0,
-    tengo: new Set(), hechos: new Set(),
+    datos: { ...datosIniciales, ...guardados, comidas: core.sanearComidas(guardados.comidas || guardados.comida ? guardados : datosIniciales) },
+    plan: null, diaSel: 0, comidaSel: 0,
+    tengo: new Set(), hechos: new Set(), // claves "dia.comida.indice"
     generando: false, sinServidor: false
   };
+  delete state.datos.comida;
   const cfgLocal = window.ECOMENU_CONFIG || {};
   const ajustes = {
     key: store.get(K.key, ""),
@@ -54,6 +59,7 @@
   };
   const claveActiva = () => (ajustes.key || cfgLocal.apiKey || "").trim();
   const enServidorWeb = () => /^https?:$/.test(location.protocol) && !state.sinServidor;
+  const kIng = (d, c, i) => `${d}.${c}.${i}`;
 
   /* ================================================================== */
   /* Indicador de conexión                                               */
@@ -84,9 +90,8 @@
     });
     $$("#stepper button").forEach((b) => {
       const i = Number(b.dataset.ir);
-      b.toggleAttribute("aria-current", i === n);
-      if (i === n) b.setAttribute("aria-current", "step");
-      b.classList.toggle("hecho", i < n || (i <= state.maxPaso && i !== n));
+      if (i === n) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+      b.classList.toggle("hecho", i !== n && i <= state.maxPaso);
       b.disabled = i > state.maxPaso;
     });
     $("#stepperFill").style.width = `${(n / 5) * 100}%`;
@@ -95,8 +100,7 @@
     if (n === 5) renderRevision();
     setStatus("");
     if (foco) {
-      const paso = $(`.step[data-step="${n}"]`);
-      const objetivo = n === 1 ? $("#presupuesto") : paso.querySelector(".step-title");
+      const objetivo = n === 1 ? $("#presupuesto") : $(`.step[data-step="${n}"] .step-title`);
       if (objetivo) { objetivo.setAttribute("tabindex", "-1"); objetivo.focus({ preventScroll: true }); }
     }
   }
@@ -106,6 +110,10 @@
       const v = num($("#presupuesto").value, NaN);
       if (!(v > 0)) { $("#errPresupuesto").textContent = "Escribe un presupuesto mayor que 0."; $("#presupuesto").focus(); return false; }
       $("#errPresupuesto").textContent = "";
+    }
+    if (n === 2) {
+      if (!state.datos.comidas.length) { $("#errComidas").textContent = "Elige al menos una comida."; return false; }
+      $("#errComidas").textContent = "";
     }
     return true;
   }
@@ -141,7 +149,8 @@
 
   function actualizarInsight() {
     const d = state.datos;
-    const platos = d.dias * d.personas;
+    const nComidas = Math.max(1, d.comidas.length);
+    const platos = d.dias * d.personas * nComidas;
     const porPlato = d.presupuesto / Math.max(1, platos);
     const usd = porPlato * (A_USD[d.moneda] || 1);
     $("#insightValor").textContent = d.presupuesto > 0 ? dinero(porPlato, d.moneda) : "—";
@@ -151,7 +160,10 @@
     else if (usd < 2.5) { txt = "Ajustado pero posible: cocina casera y económica."; color = "var(--warn)"; }
     else if (usd < 4.5) { txt = "Cómodo: hay espacio para variedad y algo de carne."; color = "var(--ok)"; }
     else { txt = "Holgado: puedes darte algunos gustos."; color = "var(--ok)"; }
-    $("#insightTexto").textContent = `${d.dias} día(s) × ${d.personas} persona(s) = ${platos} platos. ${txt}`;
+    const cuenta = nComidas > 1
+      ? `${d.dias} día(s) × ${nComidas} comidas × ${d.personas} persona(s) = ${platos} platos.`
+      : `${d.dias} día(s) × ${d.personas} persona(s) = ${platos} platos.`;
+    $("#insightTexto").textContent = `${cuenta} ${txt}`;
     const m = $("#insightMeter");
     m.style.width = `${Math.min(100, (usd / 6) * 100)}%`;
     m.style.background = color;
@@ -162,7 +174,7 @@
   $("#quickMontos").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) sincronizarPresupuesto(b.dataset.monto); });
   selMoneda.addEventListener("change", () => { state.datos.moneda = selMoneda.value; actualizarInsight(); guardarDatos(); });
 
-  /* ---------------- Paso 2: días, personas, comida ---------------- */
+  /* ---------------- Paso 2: días, personas y comidas ---------------- */
   function renderSemana() {
     $$("#semana button").forEach((b) => {
       const n = Number(b.dataset.dias);
@@ -171,10 +183,24 @@
       b.classList.toggle("en-plan", n < state.datos.dias);
     });
     const d = state.datos.dias;
-    $("#semanaTexto").textContent = d === 1 ? "Plan de 1 día · Lunes" : `Plan de ${d} días · Lunes a ${DIAS_SEMANA[d - 1]}`;
+    $("#semanaTexto").textContent = d === 1 ? "Plan de 1 día · Lunes" : `Plan de ${d} días · Lunes ${d === 2 ? "y" : "a"} ${DIAS_SEMANA[d - 1]}`;
     $("#personas").textContent = state.datos.personas;
     actualizarInsight();
   }
+
+  function renderComidas() {
+    $$("#comidas input").forEach((i) => { i.checked = state.datos.comidas.includes(i.value); });
+    const todas = state.datos.comidas.length === COMIDAS.length;
+    $("#todasComidas").textContent = todas ? "Solo almuerzo" : "Elegir las tres";
+    actualizarInsight();
+  }
+
+  function fijarComidas(lista) {
+    state.datos.comidas = COMIDAS.filter((c) => lista.includes(c));
+    if (state.datos.comidas.length) $("#errComidas").textContent = "";
+    renderComidas(); guardarDatos();
+  }
+
   $("#semana").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
     state.datos.dias = Number(b.dataset.dias); renderSemana(); guardarDatos();
@@ -189,7 +215,8 @@
   });
   $("#menosPersonas").addEventListener("click", () => { state.datos.personas = Math.max(1, state.datos.personas - 1); renderSemana(); guardarDatos(); });
   $("#masPersonas").addEventListener("click", () => { state.datos.personas = Math.min(12, state.datos.personas + 1); renderSemana(); guardarDatos(); });
-  $("#comidas").addEventListener("change", (e) => { state.datos.comida = e.target.value; guardarDatos(); });
+  $("#comidas").addEventListener("change", () => fijarComidas($$("#comidas input:checked").map((i) => i.value)));
+  $("#todasComidas").addEventListener("click", () => fijarComidas(state.datos.comidas.length === COMIDAS.length ? ["almuerzo"] : COMIDAS));
 
   /* ---------------- Pasos 3 y 4: gustos y alergias ---------------- */
   const GRUPOS = {
@@ -246,7 +273,8 @@
     const d = state.datos;
     const filas = [
       ["Presupuesto", dinero(d.presupuesto, d.moneda), 1],
-      ["Calendario", `${d.dias} día(s) · ${d.personas} persona(s) · ${d.comida}`, 2],
+      ["Calendario", `${d.dias} día(s) · ${d.personas} persona(s)`, 2],
+      ["Comidas", listaNatural(d.comidas.map((c) => ETIQUETA[c].toLowerCase())).replace(/^./, (x) => x.toUpperCase()), 2],
       ["Gustos", d.gustos.join(", ") || "Sin preferencias", 3],
       ["No puedo comer", d.alergias.join(", ") || "Nada", 4]
     ];
@@ -299,7 +327,7 @@
       const modelos = [...new Set([...preferido, ...core.MODELOS])];
       const r = await core.generarConGemini({
         apiKey: key, datos, extra, modelos,
-        onModelo: (m) => { $("#cargandoTitulo").textContent = `Cocinando con ${m}`; }
+        onModelo: (m) => { if (!$("#cargando").hidden) $("#cargandoTitulo").textContent = `Cocinando con ${m}`; }
       });
       return { ...r, fuente: "ia" };
     }
@@ -324,36 +352,47 @@
     return { plan: generarPlanDemo(datos, extra), modelo: null, fuente: "demo" };
   }
 
-  function normalizarDia(d, numero, personas) {
-    const ingredientes = (Array.isArray(d?.ingredientes) ? d.ingredientes : []).map((x) => ({
+  function normalizarReceta(r, tipo, personas) {
+    const ingredientes = (Array.isArray(r?.ingredientes) ? r.ingredientes : []).map((x) => ({
       nombre: String(x?.nombre ?? "Ingrediente").trim(),
       cantidad: String(x?.cantidad ?? "").trim(),
       precio_estimado: round2(Math.max(0, num(x?.precio_estimado)))
     }));
     return {
-      dia: numero,
-      platillo: String(d?.platillo || `Receta del día ${numero}`),
-      descripcion: String(d?.descripcion || ""),
-      tiempo_preparacion_min: Math.max(0, Math.round(num(d?.tiempo_preparacion_min))),
-      porciones: Math.max(1, Math.round(num(d?.porciones, personas))),
-      costo_dia: round2(ingredientes.reduce((s, x) => s + x.precio_estimado, 0)),
+      tipo,
+      platillo: String(r?.platillo || ETIQUETA[tipo]),
+      descripcion: String(r?.descripcion || ""),
+      tiempo_preparacion_min: Math.max(0, Math.round(num(r?.tiempo_preparacion_min))),
+      porciones: Math.max(1, Math.round(num(r?.porciones, personas))),
+      costo: round2(ingredientes.reduce((s, x) => s + x.precio_estimado, 0)),
       ingredientes,
-      pasos: (Array.isArray(d?.pasos) ? d.pasos : []).map((p) => String(p).replace(/^\s*(paso\s*)?\d+\s*[.):-]\s*/i, "").trim()).filter(Boolean),
-      consejo_ahorro: String(d?.consejo_ahorro || "")
+      pasos: (Array.isArray(r?.pasos) ? r.pasos : []).map((p) => String(p).replace(/^\s*(paso\s*)?\d+\s*[.):-]\s*/i, "").trim()).filter(Boolean),
+      consejo_ahorro: String(r?.consejo_ahorro || "")
     };
+  }
+
+  /** Ordena las recetas del día según las comidas pedidas; si la IA repite o se salta un tipo, se corrige por posición. */
+  function normalizarDia(d, numero, datos) {
+    const recibidas = Array.isArray(d?.comidas) ? d.comidas : d?.ingredientes ? [{ ...d, tipo: datos.comidas[0] }] : [];
+    const libres = [...recibidas];
+    const comidas = datos.comidas.map((tipo, i) => {
+      let k = libres.findIndex((r) => r?.tipo === tipo);
+      if (k < 0) k = libres.length ? 0 : -1;
+      const r = k >= 0 ? libres.splice(k, 1)[0] : null;
+      return r ? normalizarReceta(r, tipo, datos.personas) : null;
+    }).filter(Boolean);
+    return { dia: numero, comidas, costo_dia: round2(comidas.reduce((s, c) => s + c.costo, 0)) };
   }
 
   function normalizarPlan(raw, datos) {
     if (!raw || !Array.isArray(raw.dias) || !raw.dias.length) throw new Error("La IA devolvió un plan vacío. Vuelve a intentarlo.");
-    const dias = raw.dias.slice(0, datos.dias).map((d, i) => normalizarDia(d, i + 1, datos.personas));
-    return {
-      datos: { ...datos },
-      comentario: String(raw.resumen?.comentario || ""),
-      dias
-    };
+    const dias = raw.dias.slice(0, datos.dias).map((d, i) => normalizarDia(d, i + 1, datos)).filter((d) => d.comidas.length);
+    if (!dias.length) throw new Error("La IA devolvió un plan sin recetas. Vuelve a intentarlo.");
+    return { datos: { ...datos }, comentario: String(raw.resumen?.comentario || ""), dias };
   }
 
   const totalPlan = (plan) => round2(plan.dias.reduce((s, d) => s + d.costo_dia, 0));
+  const recalcularDia = (d) => { d.costo_dia = round2(d.comidas.reduce((s, c) => s + c.costo, 0)); };
 
   async function generarPlan() {
     const datos = core.sanearDatos(state.datos);
@@ -373,7 +412,8 @@
       }
 
       plan.fuente = fuente; plan.modelo = modelo;
-      state.plan = plan; state.diaSel = 0; state.tengo = new Set(); state.hechos = new Set();
+      state.plan = plan; state.diaSel = 0; state.comidaSel = 0;
+      state.tengo = new Set(); state.hechos = new Set();
       guardarPlan();
       mostrarCarga(false);
       renderResultados(true);
@@ -385,34 +425,38 @@
     }
   }
 
-  async function cambiarPlato(idx, boton) {
+  async function cambiarReceta(di, ci, boton) {
     const plan = state.plan; if (!plan || state.generando) return;
     const datos = plan.datos;
-    const actual = plan.dias[idx];
-    const resto = totalPlan(plan) - actual.costo_dia;
-    const disponible = round2(Math.max(datos.presupuesto - resto, actual.costo_dia * 0.8, 0.5));
+    const actual = plan.dias[di].comidas[ci];
+    const resto = totalPlan(plan) - actual.costo;
+    const disponible = round2(Math.max(datos.presupuesto - resto, actual.costo * 0.8, 0.5));
     state.generando = true;
-    boton.disabled = true; boton.textContent = "Buscando otro plato…";
+    boton.disabled = true; boton.textContent = `Buscando otro ${ETIQUETA[actual.tipo].toLowerCase()}…`;
     try {
-      const extra = { diaNumero: idx + 1, evitar: plan.dias.map((d) => d.platillo) };
-      const { plan: raw } = await pedirPlan({ ...datos, presupuesto: disponible, dias: 1 }, extra);
-      if (!raw?.dias?.length) throw new Error("No llegó ningún plato nuevo.");
-      plan.dias[idx] = normalizarDia(raw.dias[0], idx + 1, datos.personas);
-      [...state.tengo].filter((k) => k.startsWith(`${idx}-`)).forEach((k) => state.tengo.delete(k));
-      [...state.hechos].filter((k) => k.startsWith(`${idx}-`)).forEach((k) => state.hechos.delete(k));
+      const evitar = plan.dias.flatMap((d) => d.comidas.map((c) => c.platillo));
+      const extra = { diaNumero: di + 1, comidaTipo: actual.tipo, evitar };
+      const { plan: raw } = await pedirPlan({ ...datos, presupuesto: disponible, dias: 1, comidas: [actual.tipo] }, extra);
+      const recibida = raw?.dias?.[0]?.comidas?.[0];
+      if (!recibida) throw new Error("No llegó ninguna receta nueva.");
+      plan.dias[di].comidas[ci] = normalizarReceta(recibida, actual.tipo, datos.personas);
+      recalcularDia(plan.dias[di]);
+      const prefijo = `${di}.${ci}.`;
+      [...state.tengo].filter((k) => k.startsWith(prefijo)).forEach((k) => state.tengo.delete(k));
+      [...state.hechos].filter((k) => k.startsWith(prefijo)).forEach((k) => state.hechos.delete(k));
       guardarPlan();
       renderResultados();
-      toast(`Nuevo plato para el día ${idx + 1}: ${plan.dias[idx].platillo}`);
+      toast(`Nuevo ${ETIQUETA[actual.tipo].toLowerCase()} para el ${DIAS_SEMANA[di].toLowerCase()}: ${plan.dias[di].comidas[ci].platillo}`);
     } catch (err) {
-      toast(err.message || "No se pudo cambiar el plato.");
-      boton.disabled = false; boton.textContent = "Cambiar este plato";
+      toast(err.message || "No se pudo cambiar la receta.");
+      boton.disabled = false; boton.textContent = `Cambiar ${ETIQUETA[actual.tipo].toLowerCase()}`;
     } finally {
       state.generando = false;
     }
   }
 
   function guardarPlan() {
-    store.set(K.plan, { plan: state.plan, tengo: [...state.tengo], hechos: [...state.hechos], diaSel: state.diaSel });
+    store.set(K.plan, { plan: state.plan, tengo: [...state.tengo], hechos: [...state.hechos], diaSel: state.diaSel, comidaSel: state.comidaSel });
   }
 
   /* ================================================================== */
@@ -420,7 +464,10 @@
   /* ================================================================== */
   const costoTengo = () => {
     let s = 0;
-    state.tengo.forEach((k) => { const [d, i] = k.split("-").map(Number); s += state.plan.dias[d]?.ingredientes[i]?.precio_estimado || 0; });
+    state.tengo.forEach((k) => {
+      const [d, c, i] = k.split(".").map(Number);
+      s += state.plan.dias[d]?.comidas[c]?.ingredientes[i]?.precio_estimado || 0;
+    });
     return round2(s);
   };
 
@@ -429,7 +476,8 @@
     const { datos } = plan;
     $("#resultados").hidden = false;
     $("#resEyebrow").textContent = plan.fuente === "demo" ? "Plan de ejemplo" : `Generado con ${plan.modelo || "Gemini"}`;
-    $("#resTitulo").textContent = `Menú de ${plan.dias.length} ${plan.dias.length === 1 ? "día" : "días"} para ${datos.personas}`;
+    const comidasTxt = listaNatural(datos.comidas.map((c) => ETIQUETA[c].toLowerCase()));
+    $("#resTitulo").textContent = `${plan.dias.length} ${plan.dias.length === 1 ? "día" : "días"} de ${comidasTxt} para ${datos.personas}`;
     renderPresupuesto();
     renderTira();
     renderDia();
@@ -440,10 +488,10 @@
   function detectarConflictos(plan) {
     const terms = plan.datos.alergias.map((a) => a.toLowerCase()).filter((a) => a.length > 2);
     const out = [];
-    plan.dias.forEach((d) => d.ingredientes.forEach((ing) => {
+    plan.dias.forEach((d, di) => d.comidas.forEach((c) => c.ingredientes.forEach((ing) => {
       const n = ing.nombre.toLowerCase();
-      terms.forEach((t) => { if (n.includes(t) && !/\bsin\s/.test(n)) out.push(`día ${d.dia}: ${ing.nombre}`); });
-    }));
+      terms.forEach((t) => { if (n.includes(t) && !/\bsin\s/.test(n)) out.push(`${DIAS_SEMANA[di].toLowerCase()} (${c.tipo}): ${ing.nombre}`); });
+    })));
     return out;
   }
 
@@ -455,9 +503,10 @@
     const nivel = pct > 1 ? "danger" : pct > 0.92 ? "warn" : "ok";
     const C = 2 * Math.PI * 52;
     const maxDia = Math.max(...plan.dias.map((d) => d.costo_dia), 0.01);
+    const porTipo = Object.fromEntries(datos.comidas.map((t) => [t, round2(plan.dias.reduce((s, d) => s + (d.comidas.find((c) => c.tipo === t)?.costo || 0), 0))]));
     const avisos = [];
     if (plan.fuente === "demo") avisos.push(["info", claveActiva() || enServidorWeb() ? "Estás viendo recetas de ejemplo. Desactiva el modo de ejemplo en Ajustes para usar Gemini." : "Estás viendo recetas de ejemplo porque no hay una clave de Gemini configurada. Agrégala en Ajustes."]);
-    if (gastar > pres) avisos.push(["danger", "El menú supera tu presupuesto. Marca lo que ya tienes en casa, cambia algún plato o reduce días o personas."]);
+    if (gastar > pres) avisos.push(["danger", "El menú supera tu presupuesto. Marca lo que ya tienes en casa, cambia alguna receta o reduce días, comidas o personas."]);
     const conflictos = detectarConflictos(plan);
     if (conflictos.length) avisos.push(["danger", `Revisa posibles alérgenos: ${conflictos.join("; ")}.`]);
 
@@ -475,11 +524,18 @@
         </dl>
       </div>
       <div class="bars">
-        <p class="bars-title">Costo por día</p>
+        <div class="bars-head">
+          <p class="bars-title">Costo por día</p>
+          ${datos.comidas.length > 1 ? `<ul class="legend">${datos.comidas.map((t) => `<li><i class="sw-${t}"></i>${ETIQUETA[t]} <b>${esc(dinero(porTipo[t], mon))}</b></li>`).join("")}</ul>` : ""}
+        </div>
         <div class="bars-grid">
           ${plan.dias.map((d, i) => {
             const h = Math.max(6, (d.costo_dia / maxDia) * 78);
-            return `<button type="button" class="bar ${i === state.diaSel ? "activo" : ""}" data-dia="${i}" style="--h:${h}px" aria-label="Día ${i + 1}: ${esc(dinero(d.costo_dia, mon))}"><span>${esc(dinero(d.costo_dia, mon))}</span><i style="height:0"></i></button>`;
+            const detalle = d.comidas.map((c) => `${ETIQUETA[c.tipo]} ${dinero(c.costo, mon)}`).join(", ");
+            return `<button type="button" class="bar ${i === state.diaSel ? "activo" : ""}" data-dia="${i}" style="--h:${h}px" aria-label="${DIAS_SEMANA[i]}: ${esc(dinero(d.costo_dia, mon))} (${esc(detalle)})">
+              <span class="bar-val">${esc(dinero(d.costo_dia, mon))}</span>
+              <span class="stack" style="height:0">${d.comidas.map((c) => `<i class="sw-${c.tipo}" style="flex-grow:${Math.max(c.costo, 0.01)}"></i>`).join("")}</span>
+            </button>`;
           }).join("")}
         </div>
         <div class="bars-labels" aria-hidden="true">${plan.dias.map((_, i) => `<span>${DIAS_SEMANA[i].slice(0, 3)}</span>`).join("")}</div>
@@ -490,93 +546,130 @@
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const fg = $("#presupuestoPanel .ring-fg");
       if (fg) fg.style.strokeDashoffset = (C * (1 - Math.min(1, pct))).toFixed(1);
-      $$("#presupuestoPanel .bar").forEach((b) => { b.querySelector("i").style.height = b.style.getPropertyValue("--h"); });
+      $$("#presupuestoPanel .bar").forEach((b) => { b.querySelector(".stack").style.height = b.style.getPropertyValue("--h"); });
     }));
   }
+
+  /** Receta principal del día para la foto de la tarjeta: almuerzo, luego cena, luego desayuno. */
+  const recetaPrincipal = (d) => d.comidas.find((c) => c.tipo === "almuerzo") || d.comidas.find((c) => c.tipo === "cena") || d.comidas[0];
 
   function renderTira() {
     const plan = state.plan, mon = plan.datos.moneda;
     $("#tiraDias").innerHTML = plan.dias.map((d, i) => `
       <button type="button" class="day-tab" role="tab" id="tab-${i}" data-dia="${i}" aria-selected="${i === state.diaSel}" aria-controls="detalleDia" tabindex="${i === state.diaSel ? 0 : -1}">
-        <span class="day-tab-img" style="background-image:url('${fotoParaPlato(d, i, 420)}')"></span>
+        <span class="day-tab-img" style="background-image:url('${fotoParaPlato(recetaPrincipal(d), i, 420)}')"></span>
         <span class="day-tab-body">
           <span class="day-tab-day">${DIAS_SEMANA[i]}</span>
-          <span class="day-tab-name">${esc(d.platillo)}</span>
-          <span class="day-tab-cost">${esc(dinero(d.costo_dia, mon))} · ${d.tiempo_preparacion_min} min</span>
+          <span class="day-tab-meals">${d.comidas.map((c) => `<span><b class="dot sw-${c.tipo}" aria-hidden="true"></b>${esc(c.platillo)}</span>`).join("")}</span>
+          <span class="day-tab-cost">${esc(dinero(d.costo_dia, mon))}</span>
         </span>
       </button>`).join("");
   }
 
-  function seleccionarDia(i, foco = false) {
-    state.diaSel = i; guardarPlan();
-    $$("#tiraDias .day-tab").forEach((t, k) => { t.setAttribute("aria-selected", String(k === i)); t.tabIndex = k === i ? 0 : -1; });
-    $$("#presupuestoPanel .bar").forEach((b, k) => b.classList.toggle("activo", k === i));
+  function seleccionar(di, ci = 0, foco = false) {
+    state.diaSel = di;
+    state.comidaSel = Math.min(ci, state.plan.dias[di].comidas.length - 1);
+    guardarPlan();
+    $$("#tiraDias .day-tab").forEach((t, k) => { t.setAttribute("aria-selected", String(k === di)); t.tabIndex = k === di ? 0 : -1; });
+    $$("#presupuestoPanel .bar").forEach((b, k) => b.classList.toggle("activo", k === di));
     renderDia(true);
-    if (foco) $(`#tab-${i}`).focus();
+    if (foco) $(`#tab-${di}`).focus();
   }
 
-  $("#tiraDias").addEventListener("click", (e) => { const t = e.target.closest(".day-tab"); if (t) seleccionarDia(Number(t.dataset.dia)); });
+  $("#tiraDias").addEventListener("click", (e) => { const t = e.target.closest(".day-tab"); if (t) seleccionar(Number(t.dataset.dia), state.comidaSel); });
   $("#tiraDias").addEventListener("keydown", (e) => {
     const delta = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!delta || !state.plan) return;
     e.preventDefault();
     const n = state.plan.dias.length;
-    seleccionarDia((state.diaSel + delta + n) % n, true);
+    seleccionar((state.diaSel + delta + n) % n, state.comidaSel, true);
   });
   $("#presupuestoPanel").addEventListener("click", (e) => {
     const b = e.target.closest(".bar"); if (!b) return;
-    seleccionarDia(Number(b.dataset.dia));
+    seleccionar(Number(b.dataset.dia), state.comidaSel);
     $("#detalleDia").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   function renderDia(animar = false) {
-    const plan = state.plan, i = state.diaSel, d = plan.dias[i], mon = plan.datos.moneda;
+    const plan = state.plan, di = state.diaSel, d = plan.dias[di], mon = plan.datos.moneda;
+    const ci = Math.min(state.comidaSel, d.comidas.length - 1), r = d.comidas[ci];
     const el = $("#detalleDia");
-    el.setAttribute("aria-labelledby", `tab-${i}`);
-    const tengoDia = d.ingredientes.reduce((s, x, k) => s + (state.tengo.has(`${i}-${k}`) ? x.precio_estimado : 0), 0);
+    el.setAttribute("aria-labelledby", `tab-${di}`);
+    const tengoRec = r.ingredientes.reduce((s, x, k) => s + (state.tengo.has(kIng(di, ci, k)) ? x.precio_estimado : 0), 0);
+    const nombreComida = ETIQUETA[r.tipo].toLowerCase();
     el.innerHTML = `
-      <header class="day-hero" style="background-image:url('${fotoParaPlato(d, i, 1400)}')">
-        <p class="eyebrow">Día ${d.dia} · ${DIAS_SEMANA[i]} · ${esc(plan.datos.comida)}</p>
-        <h3>${esc(d.platillo)}</h3>
-        ${d.descripcion ? `<p>${esc(d.descripcion)}</p>` : ""}
-        <div class="chips">
-          <span class="chip">${d.tiempo_preparacion_min} min</span>
-          <span class="chip">${d.porciones} porciones</span>
-          <span class="chip">${esc(dinero(d.costo_dia, mon))}</span>
-          <span class="chip">${esc(dinero(d.costo_dia / Math.max(1, d.porciones), mon))} c/u</span>
+      <div class="day-bar">
+        <div class="day-bar-title">
+          <p class="eyebrow eyebrow-dark">Día ${d.dia} · ${d.comidas.length} ${d.comidas.length === 1 ? "comida" : "comidas"}</p>
+          <h3>${DIAS_SEMANA[di]} <span>${esc(dinero(d.costo_dia, mon))}</span></h3>
         </div>
-      </header>
-      <div class="day-actions">
-        <button type="button" class="btn btn-primary" id="btnCocinar" ${d.pasos.length ? "" : "disabled"}>Empezar a cocinar</button>
-        <button type="button" class="btn btn-quiet" id="btnCambiar">Cambiar este plato</button>
+        ${d.comidas.length > 1 ? `<div class="meal-switch" role="tablist" aria-label="Comidas del ${DIAS_SEMANA[di]}">
+          ${d.comidas.map((c, k) => `<button type="button" role="tab" data-comida="${k}" aria-selected="${k === ci}" tabindex="${k === ci ? 0 : -1}">
+            <b class="dot sw-${c.tipo}" aria-hidden="true"></b><span>${ETIQUETA[c.tipo]}</span><small>${esc(dinero(c.costo, mon))}</small></button>`).join("")}
+        </div>` : ""}
       </div>
-      <div class="day-cols">
-        <section class="day-col" aria-labelledby="ingTit">
-          <div class="col-title"><h4 id="ingTit">Ingredientes</h4><small>Marca lo que ya tienes</small></div>
-          <ul class="ings">
-            ${d.ingredientes.map((x, k) => {
-              const key = `${i}-${k}`, on = state.tengo.has(key);
-              return `<li><label class="ing ${on ? "tengo" : ""}">
-                <input type="checkbox" data-tengo="${key}" ${on ? "checked" : ""} aria-label="Ya tengo ${esc(x.nombre)}" />
-                <span class="ing-name">${esc(x.nombre)}<span class="ing-qty">${esc(x.cantidad)}</span></span>
-                <span class="ing-price">${esc(dinero(x.precio_estimado, mon))}</span>
-              </label></li>`;
-            }).join("")}
-          </ul>
-          <div class="ing-sum"><span>A comprar hoy</span><span>${esc(dinero(round2(d.costo_dia - tengoDia), mon))}</span></div>
-        </section>
-        <section class="day-col" aria-labelledby="pasosTit">
-          <div class="col-title"><h4 id="pasosTit">Preparación</h4><small>Toca un paso al terminarlo</small></div>
-          <ol class="steps">
-            ${d.pasos.map((p, k) => `<li class="${state.hechos.has(`${i}-${k}`) ? "hecho" : ""}"><button type="button" data-paso="${i}-${k}" aria-pressed="${state.hechos.has(`${i}-${k}`)}"><span>${esc(p)}</span></button></li>`).join("")}
-          </ol>
-          ${d.consejo_ahorro ? `<p class="tip"><b>Para ahorrar:</b> ${esc(d.consejo_ahorro)}</p>` : ""}
-        </section>
+      <div class="meal" id="recetaActual">
+        <header class="day-hero" style="background-image:url('${fotoParaPlato(r, di + ci, 1400)}')">
+          <p class="eyebrow">${ETIQUETA[r.tipo]} · ${DIAS_SEMANA[di]}</p>
+          <h3>${esc(r.platillo)}</h3>
+          ${r.descripcion ? `<p>${esc(r.descripcion)}</p>` : ""}
+          <div class="chips">
+            <span class="chip">${r.tiempo_preparacion_min} min</span>
+            <span class="chip">${r.porciones} porciones</span>
+            <span class="chip">${esc(dinero(r.costo, mon))}</span>
+            <span class="chip">${esc(dinero(r.costo / Math.max(1, r.porciones), mon))} c/u</span>
+          </div>
+        </header>
+        <div class="day-actions">
+          <button type="button" class="btn btn-primary" id="btnCocinar" ${r.pasos.length ? "" : "disabled"}>Empezar a cocinar</button>
+          <button type="button" class="btn btn-quiet" id="btnCambiar">Cambiar ${nombreComida}</button>
+        </div>
+        <div class="day-cols">
+          <section class="day-col" aria-labelledby="ingTit">
+            <div class="col-title"><h4 id="ingTit">Ingredientes</h4><small>Marca lo que ya tienes</small></div>
+            <ul class="ings">
+              ${r.ingredientes.map((x, k) => {
+                const key = kIng(di, ci, k), on = state.tengo.has(key);
+                return `<li><label class="ing ${on ? "tengo" : ""}">
+                  <input type="checkbox" data-tengo="${key}" ${on ? "checked" : ""} aria-label="Ya tengo ${esc(x.nombre)}" />
+                  <span class="ing-name">${esc(x.nombre)}<span class="ing-qty">${esc(x.cantidad)}</span></span>
+                  <span class="ing-price">${esc(dinero(x.precio_estimado, mon))}</span>
+                </label></li>`;
+              }).join("")}
+            </ul>
+            <div class="ing-sum"><span>A comprar para este ${nombreComida}</span><span>${esc(dinero(round2(r.costo - tengoRec), mon))}</span></div>
+          </section>
+          <section class="day-col" aria-labelledby="pasosTit">
+            <div class="col-title"><h4 id="pasosTit">Preparación</h4><small>Toca un paso al terminarlo</small></div>
+            <ol class="steps">
+              ${r.pasos.map((p, k) => { const key = kIng(di, ci, k); return `<li class="${state.hechos.has(key) ? "hecho" : ""}"><button type="button" data-paso="${key}" aria-pressed="${state.hechos.has(key)}"><span>${esc(p)}</span></button></li>`; }).join("")}
+            </ol>
+            ${r.consejo_ahorro ? `<p class="tip"><b>Para ahorrar:</b> ${esc(r.consejo_ahorro)}</p>` : ""}
+          </section>
+        </div>
       </div>`;
-    if (animar) { el.classList.remove("cambia"); void el.offsetWidth; el.classList.add("cambia"); }
-    $("#btnCocinar").addEventListener("click", () => abrirCocina(i));
-    $("#btnCambiar").addEventListener("click", (e) => cambiarPlato(i, e.currentTarget));
+    if (animar) { const m = $("#recetaActual"); m.classList.remove("cambia"); void m.offsetWidth; m.classList.add("cambia"); }
+    $("#btnCocinar").addEventListener("click", () => abrirCocina(di, ci));
+    $("#btnCambiar").addEventListener("click", (e) => cambiarReceta(di, ci, e.currentTarget));
   }
 
+  $("#detalleDia").addEventListener("click", (e) => {
+    const sw = e.target.closest("[data-comida]");
+    if (sw) { state.comidaSel = Number(sw.dataset.comida); guardarPlan(); renderDia(true); $(`[data-comida="${state.comidaSel}"]`).focus(); return; }
+    const b = e.target.closest("[data-paso]"); if (!b) return;
+    const key = b.dataset.paso;
+    if (state.hechos.has(key)) state.hechos.delete(key); else state.hechos.add(key);
+    guardarPlan();
+    b.parentElement.classList.toggle("hecho", state.hechos.has(key));
+    b.setAttribute("aria-pressed", String(state.hechos.has(key)));
+  });
+  $("#detalleDia").addEventListener("keydown", (e) => {
+    if (!e.target.closest(".meal-switch")) return;
+    const delta = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!delta) return;
+    e.preventDefault();
+    const n = state.plan.dias[state.diaSel].comidas.length;
+    state.comidaSel = (state.comidaSel + delta + n) % n;
+    guardarPlan(); renderDia(true); $(`[data-comida="${state.comidaSel}"]`).focus();
+  });
   $("#detalleDia").addEventListener("change", (e) => {
     const key = e.target.dataset.tengo; if (!key) return;
     if (e.target.checked) state.tengo.add(key); else state.tengo.delete(key);
@@ -585,37 +678,27 @@
     const scroll = window.scrollY; renderDia(); window.scrollTo(0, scroll);
     const cb = $(`[data-tengo="${key}"]`); if (cb) cb.focus({ preventScroll: true });
   });
-  $("#detalleDia").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-paso]"); if (!b) return;
-    const key = b.dataset.paso;
-    if (state.hechos.has(key)) state.hechos.delete(key); else state.hechos.add(key);
-    guardarPlan();
-    b.parentElement.classList.toggle("hecho", state.hechos.has(key));
-    b.setAttribute("aria-pressed", String(state.hechos.has(key)));
-  });
 
-  /* ---------------- Ticket de compras ---------------- */
-  function listaCompras() {
-    const plan = state.plan, mapa = new Map();
-    plan.dias.forEach((d, i) => d.ingredientes.forEach((x, k) => {
-      const clave = x.nombre.toLowerCase().replace(/\s+/g, " ").trim();
-      const it = mapa.get(clave) || { nombre: x.nombre, cantidades: [], total: 0, tengo: true };
-      it.cantidades.push(x.cantidad); it.total += x.precio_estimado;
-      if (!state.tengo.has(`${i}-${k}`)) it.tengo = false;
-      mapa.set(clave, it);
-    }));
-    return [...mapa.values()].sort((a, b) => a.tengo - b.tengo || b.total - a.total);
-  }
+  /* ---------------- Lista de compras ---------------- */
+  const totalAComprar = () => round2(totalPlan(state.plan) - costoTengo());
 
   function renderTicket() {
-    const plan = state.plan, mon = plan.datos.moneda, items = listaCompras();
+    const plan = state.plan, mon = plan.datos.moneda;
+    const grupos = EcoCompras.construir(plan, state.tengo);
     const total = totalPlan(plan), tengo = costoTengo();
     const fecha = new Date().toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" });
-    $("#ticketSub").textContent = `${fecha} · ${plan.dias.length} día(s) · ${plan.datos.personas} persona(s)`;
-    $("#ticketLista").innerHTML = items.map((it, n) => `
-      <li>
-        <label><input type="checkbox" id="tk-${n}" ${it.tengo ? "checked" : ""} /><span><span class="t-name">${esc(it.nombre)}</span><br><span class="t-qty">${esc(it.cantidades.join(" + "))}</span></span></label>
-        <span class="t-price">${esc(dinero(round2(it.total), mon))}</span>
+    const nItems = grupos.reduce((s, g) => s + g.items.length, 0);
+    $("#ticketSub").textContent = `${fecha} · ${plan.dias.length} día(s) · ${plan.datos.personas} persona(s) · ${nItems} productos`;
+    let n = 0;
+    $("#ticketLista").innerHTML = grupos.map((g) => `
+      <li class="t-group">
+        <p class="t-aisle"><span>${esc(g.nombre)}</span><span>${esc(dinero(g.total, mon))}</span></p>
+        <ul>
+          ${g.items.map((it) => `<li class="${it.enCasa ? "en-casa" : ""}">
+            <label><input type="checkbox" id="tk-${n++}" ${it.enCasa ? "checked" : ""} /><span><span class="t-name">${esc(it.nombre)}</span><br><span class="t-qty">${esc(it.cantidad || "al gusto")}${it.usos > 1 ? ` · en ${it.usos} recetas` : ""}</span></span></label>
+            <span class="t-price">${esc(dinero(it.enCasa ? it.total : it.aComprar, mon))}</span>
+          </li>`).join("")}
+        </ul>
       </li>`).join("");
     $("#ticketTotal").innerHTML = `
       <div><span>Subtotal</span><span>${esc(dinero(total, mon))}</span></div>
@@ -626,20 +709,22 @@
   async function copiarLista() {
     if (!state.plan) return;
     const mon = state.plan.datos.moneda;
-    const items = listaCompras().filter((it) => !it.tengo);
-    const texto = [
-      `Lista de compras · EcoMenú IA`,
-      ...items.map((it) => `- ${it.nombre} (${it.cantidades.join(" + ")}) · ${dinero(round2(it.total), mon)}`),
-      `Total: ${dinero(round2(totalPlan(state.plan) - costoTengo()), mon)}`
-    ].join("\n");
-    try { await navigator.clipboard.writeText(texto); toast("Lista copiada al portapapeles"); }
+    const texto = EcoCompras.aTexto({
+      plan: state.plan,
+      grupos: EcoCompras.construir(state.plan, state.tengo),
+      dinero: (v) => dinero(round2(v), mon),
+      diasSemana: DIAS_SEMANA,
+      etiquetasComida: ETIQUETA,
+      totalComprar: totalAComprar()
+    });
+    try { await navigator.clipboard.writeText(texto); toast("Lista copiada: pégala en WhatsApp o en tus notas"); }
     catch {
       const ta = document.createElement("textarea");
       ta.value = texto; ta.style.position = "fixed"; ta.style.opacity = "0";
       document.body.appendChild(ta); ta.select();
       let ok = false; try { ok = document.execCommand("copy"); } catch { /* nada */ }
       ta.remove();
-      toast(ok ? "Lista copiada al portapapeles" : "No se pudo copiar. Selecciona el ticket y cópialo a mano.");
+      toast(ok ? "Lista copiada: pégala en WhatsApp o en tus notas" : "No se pudo copiar. Selecciona el ticket y cópialo a mano.");
     }
   }
   $("#btnCopiar").addEventListener("click", copiarLista);
@@ -652,8 +737,9 @@
   /* ================================================================== */
   /* Modo cocina                                                         */
   /* ================================================================== */
-  const cocina = { dia: 0, paso: 0, restante: 0, intervalo: null, wake: null };
+  const cocina = { dia: 0, com: 0, paso: 0, restante: 0, intervalo: null, wake: null };
   const dlgCocina = $("#modoCocina");
+  const recetaCocina = () => state.plan.dias[cocina.dia].comidas[cocina.com];
 
   function minutosDe(texto) {
     const m = texto.match(/(\d+)\s*(?:[-–a]\s*(\d+))?\s*(?:min|minutos)\b/i);
@@ -685,10 +771,10 @@
   }
 
   function pintarPaso() {
-    const d = state.plan.dias[cocina.dia], total = d.pasos.length, p = d.pasos[cocina.paso];
+    const r = recetaCocina(), total = r.pasos.length, p = r.pasos[cocina.paso];
     pararTimer();
-    $("#cocinaDia").textContent = `Día ${d.dia} · ${DIAS_SEMANA[cocina.dia]}`;
-    $("#cocinaPlato").textContent = d.platillo;
+    $("#cocinaDia").textContent = `${ETIQUETA[r.tipo]} · ${DIAS_SEMANA[cocina.dia]}`;
+    $("#cocinaPlato").textContent = r.platillo;
     $("#cocinaContador").textContent = `Paso ${cocina.paso + 1} de ${total}`;
     $("#cocinaBarra").style.width = `${((cocina.paso + 1) / total) * 100}%`;
     const elPaso = $("#cocinaPaso");
@@ -700,21 +786,21 @@
     $("#cocinaSiguiente").textContent = cocina.paso === total - 1 ? "Terminar" : "Siguiente paso";
   }
 
-  async function abrirCocina(i) {
-    cocina.dia = i; cocina.paso = 0;
-    const d = state.plan.dias[i];
-    const primeroPendiente = d.pasos.findIndex((_, k) => !state.hechos.has(`${i}-${k}`));
-    if (primeroPendiente > 0) cocina.paso = primeroPendiente;
+  async function abrirCocina(di, ci) {
+    cocina.dia = di; cocina.com = ci; cocina.paso = 0;
+    const r = recetaCocina();
+    const pendiente = r.pasos.findIndex((_, k) => !state.hechos.has(kIng(di, ci, k)));
+    if (pendiente > 0) cocina.paso = pendiente;
     pintarPaso();
     dlgCocina.showModal();
     try { cocina.wake = await navigator.wakeLock?.request("screen"); } catch { /* sin bloqueo de pantalla */ }
   }
 
   function moverCocina(delta) {
-    const d = state.plan.dias[cocina.dia];
-    if (delta > 0) state.hechos.add(`${cocina.dia}-${cocina.paso}`);
+    const r = recetaCocina();
+    if (delta > 0) state.hechos.add(kIng(cocina.dia, cocina.com, cocina.paso));
     const n = cocina.paso + delta;
-    if (n >= d.pasos.length) { dlgCocina.close(); toast("¡Buen provecho!"); return; }
+    if (n >= r.pasos.length) { guardarPlan(); dlgCocina.close(); toast("¡Buen provecho!"); return; }
     cocina.paso = Math.max(0, n);
     guardarPlan(); pintarPaso();
   }
@@ -734,7 +820,7 @@
   });
   $("#btnTimer").addEventListener("click", () => {
     if (cocina.intervalo) { pararTimer(); $("#btnTimer").textContent = "Reanudar"; return; }
-    if (cocina.restante <= 0) cocina.restante = minutosDe(state.plan.dias[cocina.dia].pasos[cocina.paso]) * 60;
+    if (cocina.restante <= 0) cocina.restante = minutosDe(recetaCocina().pasos[cocina.paso]) * 60;
     $("#btnTimer").textContent = "Pausar";
     cocina.intervalo = setInterval(() => {
       cocina.restante -= 1; pintarReloj();
@@ -792,36 +878,39 @@
     t.textContent = msg; t.hidden = false;
     t.style.animation = "none"; void t.offsetWidth; t.style.animation = "";
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 3400);
   }
+
+  /* Si una foto no carga, se oculta y queda el fondo marrón de la tarjeta. */
+  document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.style.visibility = "hidden"; }, true);
 
   /* ================================================================== */
   /* Inicio                                                              */
   /* ================================================================== */
-  /* Si una foto no carga, se oculta y queda el fondo marrón de la tarjeta. */
-  document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.style.visibility = "hidden"; }, true);
-
   function iniciar() {
     const fp = $("#factPrecios");
     if (fp) fp.textContent = Object.values(PRECIOS_REFERENCIA).reduce((s, g) => s + Object.keys(g).length, 0);
 
     selMoneda.value = state.datos.moneda;
-    $(`#comidas input[value="${state.datos.comida}"]`)?.click();
     $("#notas").value = state.datos.notas || "";
     sincronizarPresupuesto(state.datos.presupuesto);
     renderSemana();
+    renderComidas();
     renderGrupo("gustos"); renderGrupo("alergias");
     irAPaso(1, { foco: false });
     actualizarConexion();
 
+    store.del("eco.plan"); // formato anterior (una receta por día)
     const guardado = store.get(K.plan);
-    if (guardado?.plan?.dias?.length) {
+    if (guardado?.plan?.dias?.[0]?.comidas) {
       state.plan = guardado.plan;
       state.tengo = new Set(guardado.tengo || []);
       state.hechos = new Set(guardado.hechos || []);
       state.diaSel = Math.min(guardado.diaSel || 0, state.plan.dias.length - 1);
+      state.comidaSel = guardado.comidaSel || 0;
       renderResultados();
     }
+    guardarDatos();
   }
   iniciar();
 })();

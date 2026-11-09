@@ -18,6 +18,33 @@
 
   const COMIDAS = ["desayuno", "almuerzo", "cena"];
 
+  const RECETA_SCHEMA = {
+    type: "OBJECT",
+    properties: {
+      tipo: { type: "STRING", enum: COMIDAS },
+      platillo: { type: "STRING" },
+      descripcion: { type: "STRING" },
+      tiempo_preparacion_min: { type: "INTEGER" },
+      porciones: { type: "INTEGER" },
+      costo: { type: "NUMBER" },
+      ingredientes: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            nombre: { type: "STRING" },
+            cantidad: { type: "STRING" },
+            precio_estimado: { type: "NUMBER" }
+          },
+          required: ["nombre", "cantidad", "precio_estimado"]
+        }
+      },
+      pasos: { type: "ARRAY", items: { type: "STRING" } },
+      consejo_ahorro: { type: "STRING" }
+    },
+    required: ["tipo", "platillo", "tiempo_preparacion_min", "porciones", "costo", "ingredientes", "pasos"]
+  };
+
   const RESPONSE_SCHEMA = {
     type: "OBJECT",
     properties: {
@@ -37,27 +64,10 @@
           type: "OBJECT",
           properties: {
             dia: { type: "INTEGER" },
-            platillo: { type: "STRING" },
-            descripcion: { type: "STRING" },
-            tiempo_preparacion_min: { type: "INTEGER" },
-            porciones: { type: "INTEGER" },
             costo_dia: { type: "NUMBER" },
-            ingredientes: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  nombre: { type: "STRING" },
-                  cantidad: { type: "STRING" },
-                  precio_estimado: { type: "NUMBER" }
-                },
-                required: ["nombre", "cantidad", "precio_estimado"]
-              }
-            },
-            pasos: { type: "ARRAY", items: { type: "STRING" } },
-            consejo_ahorro: { type: "STRING" }
+            comidas: { type: "ARRAY", items: RECETA_SCHEMA }
           },
-          required: ["dia", "platillo", "tiempo_preparacion_min", "porciones", "costo_dia", "ingredientes", "pasos"]
+          required: ["dia", "costo_dia", "comidas"]
         }
       }
     },
@@ -75,13 +85,20 @@
       .filter(Boolean)
       .slice(0, maxItems);
 
+  /** Devuelve las comidas elegidas en orden del día. Acepta el formato antiguo { comida: "almuerzo" }. */
+  function sanearComidas(d = {}) {
+    const elegidas = Array.isArray(d.comidas) ? d.comidas : d.comida ? [d.comida] : [];
+    const validas = COMIDAS.filter((c) => elegidas.includes(c));
+    return validas.length ? validas : ["almuerzo"];
+  }
+
   function sanearDatos(d = {}) {
     return {
       presupuesto: Math.round(num(d.presupuesto, 0.01, 1e9, 0) * 100) / 100,
       moneda: /^[A-Z]{3}$/.test(d.moneda) ? d.moneda : "USD",
       dias: Math.round(num(d.dias, 1, 7, 3)),
       personas: Math.round(num(d.personas, 1, 12, 2)),
-      comida: COMIDAS.includes(d.comida) ? d.comida : "almuerzo",
+      comidas: sanearComidas(d),
       gustos: lista(d.gustos),
       alergias: lista(d.alergias),
       notas: String(d.notas ?? "").slice(0, 500).trim()
@@ -92,7 +109,8 @@
     return {
       feedback: String(e.feedback ?? "").slice(0, 600),
       evitar: lista(e.evitar, 10, 80),
-      diaNumero: e.diaNumero ? Math.round(num(e.diaNumero, 1, 7, 1)) : 0
+      diaNumero: e.diaNumero ? Math.round(num(e.diaNumero, 1, 7, 1)) : 0,
+      comidaTipo: COMIDAS.includes(e.comidaTipo) ? e.comidaTipo : ""
     };
   }
 
@@ -100,7 +118,7 @@
   function construirSystemPrompt() {
     return [
       "Eres EcoMenú IA, un chef nutricionista experto en cocina económica latinoamericana y en optimizar presupuestos de compra.",
-      "Tu tarea es crear un menú con UNA receta por día, ajustándote ESTRICTAMENTE al presupuesto y respetando SIEMPRE las alergias y restricciones.",
+      "Tu tarea es crear un menú diario con una receta por cada comida pedida (desayuno, almuerzo y/o cena), ajustándote ESTRICTAMENTE al presupuesto y respetando SIEMPRE las alergias y restricciones.",
       "",
       "BASE DE PRECIOS DE REFERENCIA (en USD, por la unidad indicada en cada clave):",
       JSON.stringify(PRECIOS, null, 2),
@@ -109,32 +127,34 @@
       "1. Usa los precios de referencia para calcular el costo. Para ingredientes que no estén en la lista, estima un precio realista y económico.",
       "2. 'precio_estimado' es el costo proporcional de la cantidad usada (ej. 250 g de arroz a 1.50/kg = 0.38), no el del paquete completo.",
       "3. Si la moneda no es USD, convierte los precios con un tipo de cambio aproximado actual y expresa TODOS los montos en esa moneda.",
-      "4. 'costo_dia' = suma de los precio_estimado del día. 'costo_total' = suma de todos los costo_dia.",
+      "4. 'costo' de cada receta = suma de sus precio_estimado. 'costo_dia' = suma de los 'costo' de sus comidas. 'costo_total' = suma de todos los costo_dia.",
       "5. 'costo_total' NUNCA puede superar el presupuesto. Si es ajustado, usa ingredientes baratos (legumbres, huevo, arroz, verduras de temporada) y reutiliza ingredientes entre días.",
       "6. PROHIBIDO incluir ingredientes que contengan o deriven de un alérgeno indicado (lactosa → leche, queso, mantequilla, crema; gluten → trigo, pasta común, pan común, harina de trigo).",
-      "7. Prioriza los gustos del usuario y varía los platillos entre días.",
-      "8. Las cantidades son para el número de porciones indicado. Los pasos deben ser claros y prácticos; si un paso tiene un tiempo de cocción, indícalo en minutos (ej. 'Cocina 15 minutos').",
+      "7. Prioriza los gustos del usuario y varía los platillos entre días. El desayuno debe ser típico de desayuno (avena, huevos, pan, fruta, arepas, etc.); el almuerzo es la comida más completa; la cena es más ligera que el almuerzo.",
+      "8. Las cantidades son para el número de porciones indicado. Usa entre 3 y 7 pasos breves y claros; si un paso tiene un tiempo de cocción, indícalo en minutos (ej. 'Cocina 15 minutos'). Reparte el presupuesto con sentido: el almuerzo suele costar más que el desayuno.",
       "9. Asume que el usuario tiene sal y agua; todo lo demás debe costearse.",
       "10. Responde ÚNICAMENTE con JSON válido según el esquema, en español con ortografía correcta (incluidas las tildes: preparación, maíz, limón)."
     ].join("\n");
   }
 
   function construirUserPrompt(d, extra = {}) {
-    const unDia = extra.diaNumero > 0;
+    const unaReceta = extra.diaNumero > 0;
+    const comidas = unaReceta && extra.comidaTipo ? [extra.comidaTipo] : d.comidas;
     const lineas = [
-      `Presupuesto ${unDia ? "disponible para este día" : "total"}: ${d.presupuesto} ${d.moneda}`,
-      `Número de días: ${unDia ? 1 : d.dias}`,
-      `Comida a planificar cada día: ${d.comida}`,
+      `Presupuesto ${unaReceta ? "disponible para esta receta" : "total"}: ${d.presupuesto} ${d.moneda}`,
+      `Número de días: ${unaReceta ? 1 : d.dias}`,
+      `Comidas de cada día, en este orden: ${comidas.join(", ")}`,
       `Porciones por receta (personas): ${d.personas}`,
       `Gustos / preferencias: ${d.gustos.length ? d.gustos.join(", ") : "sin preferencias específicas"}`,
       `Alergias / restricciones (PROHIBIDAS): ${d.alergias.length ? d.alergias.join(", ") : "ninguna"}`
     ];
     if (d.notas) lineas.push(`Notas del usuario: ${d.notas}`);
     lineas.push("");
-    if (unDia) {
-      lineas.push(`Genera exactamente 1 día, con 'dia' = ${extra.diaNumero}. Debe ser un platillo DISTINTO a estos: ${extra.evitar.join("; ") || "ninguno"}.`);
+    if (unaReceta) {
+      lineas.push(`Genera exactamente 1 día con 'dia' = ${extra.diaNumero} y una sola comida de tipo "${comidas[0]}". Debe ser un platillo DISTINTO a estos: ${extra.evitar.join("; ") || "ninguno"}.`);
     } else {
-      lineas.push(`Genera exactamente ${d.dias} día(s), numerados del 1 al ${d.dias}.`);
+      const total = d.dias * comidas.length;
+      lineas.push(`Genera exactamente ${d.dias} día(s), numerados del 1 al ${d.dias}. Cada día lleva en 'comidas' exactamente ${comidas.length} receta(s), una por tipo (${comidas.join(", ")}), en ese orden. Son ${total} recetas en total y el presupuesto debe alcanzar para todas.`);
     }
     lineas.push(`En 'resumen.presupuesto_total' devuelve ${d.presupuesto} y en 'resumen.moneda' "${d.moneda}". En 'resumen.comentario' explica en 1 o 2 frases cómo se optimizó el presupuesto.`);
     if (extra.feedback) lineas.push("", "CORRECCIÓN IMPORTANTE:", extra.feedback);
@@ -212,7 +232,7 @@
    * Genera el plan probando los modelos en orden.
    * @returns {Promise<{plan: object, modelo: string}>}
    */
-  async function generarConGemini({ apiKey, datos, extra = {}, modelos = MODELOS, timeoutMs = 60000, onModelo }) {
+  async function generarConGemini({ apiKey, datos, extra = {}, modelos = MODELOS, timeoutMs = 120000, onModelo }) {
     const d = sanearDatos(datos);
     const e = sanearExtra(extra);
     const systemPrompt = construirSystemPrompt();
@@ -232,8 +252,8 @@
   }
 
   const api = {
-    MODELOS, RESPONSE_SCHEMA, EcoError,
-    sanearDatos, sanearExtra, construirSystemPrompt, construirUserPrompt,
+    MODELOS, COMIDAS, RESPONSE_SCHEMA, EcoError,
+    sanearDatos, sanearComidas, sanearExtra, construirSystemPrompt, construirUserPrompt,
     parsearJSON, generarConGemini
   };
 

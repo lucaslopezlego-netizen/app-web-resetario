@@ -42,11 +42,11 @@
         <div class="hero-copy">
           <p class="eyebrow">Cocina por presupuesto</p>
           <h1>Una semana de buena comida con el dinero que tienes.</h1>
-          <p class="lede">Dinos cuánto puedes gastar, qué te gusta y qué no puedes comer. Gemini arma una receta por día, con ingredientes, precios y pasos, sin pasarse del presupuesto.</p>
+          <p class="lede">Dinos cuánto puedes gastar, qué te gusta y qué no puedes comer. Gemini arma el desayuno, el almuerzo y la cena que elijas para cada día, con ingredientes, precios y pasos, sin pasarse del presupuesto.</p>
           <ul class="hero-facts">
             <li><strong>1 a 7</strong><span>días por plan</span></li>
             <li><strong id="factPrecios">33</strong><span>precios de referencia</span></li>
-            <li><strong>1</strong><span>receta por día, con pasos</span></li>
+            <li><strong>3</strong><span>comidas al día, a tu elección</span></li>
           </ul>
         </div>
 
@@ -119,24 +119,28 @@
                 </div>
               </div>
 
-              <p class="label-strong">¿Qué comida del día?</p>
-              <div class="photo-options photo-options-3" role="radiogroup" aria-label="Comida del día" id="comidas">
+              <div class="label-row">
+                <p class="label-strong" id="comidasLabel">¿Qué comidas planificamos?</p>
+                <button type="button" class="link-btn" id="todasComidas">Elegir las tres</button>
+              </div>
+              <div class="photo-options photo-options-3" role="group" aria-labelledby="comidasLabel" id="comidas">
                 <label class="photo-opt">
-                  <input type="radio" name="comida" value="desayuno" />
+                  <input type="checkbox" name="comidas" value="desayuno" />
                   <img src="https://images.unsplash.com/photo-1787559793297-8494fb140c9f?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" />
-                  <span>Desayuno</span>
+                  <span>Desayuno<small>mañana</small></span>
                 </label>
                 <label class="photo-opt">
-                  <input type="radio" name="comida" value="almuerzo" checked />
+                  <input type="checkbox" name="comidas" value="almuerzo" />
                   <img src="https://images.unsplash.com/photo-1708184528306-f75a0a5118ee?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" />
-                  <span>Almuerzo</span>
+                  <span>Almuerzo<small>mediodía</small></span>
                 </label>
                 <label class="photo-opt">
-                  <input type="radio" name="comida" value="cena" />
+                  <input type="checkbox" name="comidas" value="cena" />
                   <img src="https://images.unsplash.com/photo-1658661521707-56d8955f6c19?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" />
-                  <span>Cena</span>
+                  <span>Cena<small>noche</small></span>
                 </label>
               </div>
+              <p class="field-error" id="errComidas" role="alert"></p>
             </div>
 
             <!-- Paso 3 -->
@@ -311,6 +315,7 @@
   <script src="js/precios.js"></script>
   <script src="js/ecomenu-core.js"></script>
   <script src="js/fotos.js"></script>
+  <script src="js/compras.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -185,67 +185,155 @@ const MAPA_ALERGENOS = {
   carne: ["vegetarian", "vegan"]
 };
 
-function generarPlanDemo({ presupuesto, dias, personas, gustos, alergias, moneda }, extra = {}) {
-  const evitar = (extra.evitar || []).map((x) => x.toLowerCase());
+/** Recetas de desayuno para el modo de ejemplo (mismo formato que RECETAS_DEMO). */
+const RECETAS_DESAYUNO = [
+  {
+    platillo: "Avena cocida con plátano y canela",
+    descripcion: "Desayuno tibio, barato y que llena.",
+    tiempo: 10, alergenos: ["lactosa"], tags: ["casera", "saludable", "rápida", "vegetariana"],
+    ingredientes: [
+      ["120 g de avena", ["carbohidratos", "avena_kg"], 0.12],
+      ["400 ml de leche", ["lacteos_otros", "leche_litro"], 0.4],
+      ["2 plátanos", ["vegetales_frutas", "platanos_kg"], 0.35],
+      ["Canela", ["lacteos_otros", "especias_sobre"], 0.3]
+    ],
+    pasos: ["Calienta la leche con la avena a fuego medio.", "Cocina 5 minutos removiendo hasta que espese.", "Sirve con el plátano en rodajas y canela por encima."]
+  },
+  {
+    platillo: "Huevos revueltos con tomate y pan",
+    descripcion: "Clásico rápido con proteína para empezar el día.",
+    tiempo: 12, alergenos: ["huevo", "gluten"], tags: ["casera", "rápida", "proteica", "vegetariana"],
+    ingredientes: [
+      ["4 huevos", ["proteinas", "huevos_docena"], 0.33],
+      ["1 tomate", ["vegetales_frutas", "tomate_kg"], 0.15],
+      ["2 panes", ["carbohidratos", "pan_unidad"], 2],
+      ["1 cda de aceite", ["lacteos_otros", "aceite_litro"], 0.015]
+    ],
+    pasos: ["Pica el tomate y sofríelo 2 minutos en el aceite.", "Agrega los huevos batidos con sal y remueve 3 minutos.", "Sirve con el pan tostado."]
+  },
+  {
+    platillo: "Tostadas con tomate y aceite",
+    descripcion: "Pan crujiente con tomate rallado, al estilo mediterráneo.",
+    tiempo: 8, alergenos: ["gluten"], tags: ["rápida", "vegetariana", "saludable"],
+    ingredientes: [
+      ["4 panes", ["carbohidratos", "pan_unidad"], 4],
+      ["2 tomates", ["vegetales_frutas", "tomate_kg"], 0.3],
+      ["1 diente de ajo", ["vegetales_frutas", "ajo_cabeza"], 0.1],
+      ["2 cdas de aceite", ["lacteos_otros", "aceite_litro"], 0.03]
+    ],
+    pasos: ["Tuesta el pan.", "Frota el ajo sobre el pan y ralla el tomate encima.", "Termina con un chorrito de aceite y sal."]
+  },
+  {
+    platillo: "Arroz con huevo y plátano",
+    descripcion: "Desayuno contundente sin gluten ni lácteos.",
+    tiempo: 15, alergenos: ["huevo"], tags: ["casera", "proteica"],
+    ingredientes: [
+      ["150 g de arroz", ["carbohidratos", "arroz_kg"], 0.15],
+      ["2 huevos", ["proteinas", "huevos_docena"], 0.17],
+      ["1 plátano", ["vegetales_frutas", "platanos_kg"], 0.2],
+      ["1 cda de aceite", ["lacteos_otros", "aceite_litro"], 0.015]
+    ],
+    pasos: ["Cocina el arroz (o usa arroz del día anterior).", "Fríe los huevos y el plátano en rodajas 4 minutos.", "Sirve todo junto."]
+  },
+  {
+    platillo: "Papas salteadas con espinaca",
+    descripcion: "Desayuno salado sin gluten, lácteos ni huevo.",
+    tiempo: 20, alergenos: [], tags: ["casera", "vegetariana", "saludable"],
+    ingredientes: [
+      ["400 g de papas", ["carbohidratos", "papas_kg"], 0.4],
+      ["1 manojo de espinaca", ["vegetales_frutas", "espinaca_manojo"], 0.5],
+      ["1/2 cebolla", ["vegetales_frutas", "cebolla_kg"], 0.08],
+      ["2 cdas de aceite", ["lacteos_otros", "aceite_litro"], 0.03]
+    ],
+    pasos: ["Corta las papas en cubos pequeños y saltéalas 12 minutos.", "Añade la cebolla y la espinaca y cocina 3 minutos.", "Sazona con sal y pimienta."]
+  }
+];
+
+/** Multiplica la cantidad inicial del texto ("400 g de pollo", "1/2 cebolla") por la escala. */
+function escalarCantidad(texto, escala) {
+  if (escala === 1) return texto;
+  const m = texto.match(/^(\d+)(?:\/(\d+))?(?:[.,](\d+))?\s*/);
+  if (!m) return texto;
+  const base = m[2] ? Number(m[1]) / Number(m[2]) : Number(`${m[1]}.${m[3] || 0}`);
+  const v = base * escala;
+  const bonito = v >= 10 ? String(Math.round(v)) : String(Math.round(v * 10) / 10).replace(".", ",");
+  return `${bonito} ${texto.slice(m[0].length)}`;
+}
+
+/** Nombre del ingrediente sin la cantidad: "400 g de pollo" → "Pollo". */
+function nombreIngrediente(texto) {
+  const n = texto.replace(/^[\d/.,\s]+(g|kg|ml|cdas?|latas?|paquetes?|dientes?|manojos?)?\s*(de\s+)?/i, "").trim() || texto;
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+
+function generarPlanDemo(datos, extra = {}) {
+  const { presupuesto, personas, gustos = [], alergias = [], moneda } = datos;
+  const comidas = extra.comidaTipo ? [extra.comidaTipo]
+    : (Array.isArray(datos.comidas) && datos.comidas.length ? datos.comidas : [datos.comida || "almuerzo"]);
   const diaNumero = extra.diaNumero || 0;
-  if (diaNumero) dias = 1;
+  const dias = diaNumero ? 1 : datos.dias;
+  const evitar = new Set((extra.evitar || []).map((x) => x.toLowerCase()));
+
   const restricciones = alergias.map((a) => a.toLowerCase());
   const esVeg = restricciones.some((r) => r.includes("vegetarian") || r.includes("vegan")) ||
     gustos.some((g) => g.toLowerCase().includes("vegetarian"));
-
   const proh = new Set();
   for (const [alergeno, claves] of Object.entries(MAPA_ALERGENOS)) {
     if (restricciones.some((r) => claves.some((c) => r.includes(c)))) proh.add(alergeno);
   }
-
-  let candidatas = RECETAS_DEMO.filter((r) => !r.alergenos.some((a) => proh.has(a)));
-  if (esVeg) {
-    candidatas = candidatas.filter((r) =>
-      !r.ingredientes.some(([, [, k]]) => /pollo|carne|atun/.test(k)));
-  }
-  if (!candidatas.length) candidatas = RECETAS_DEMO.filter((r) => r.alergenos.length === 0);
-
-  // Prioriza las que coinciden con los gustos.
   const gustosLc = gustos.map((g) => g.toLowerCase());
   const puntuar = (r) => r.tags.filter((t) => gustosLc.some((g) => g.includes(t))).length;
-  candidatas = [...candidatas].sort((a, b) => puntuar(b) - puntuar(a));
-  if (diaNumero) {
-    const libres = candidatas.filter((r) => !evitar.includes(r.platillo.toLowerCase()));
-    if (libres.length) candidatas = libres;
-    const k = Math.floor(Math.random() * candidatas.length);
-    candidatas = [candidatas[k]];
+
+  function pool(lista) {
+    let c = lista.filter((r) => !r.alergenos.some((a) => proh.has(a)));
+    if (esVeg) c = c.filter((r) => !r.ingredientes.some(([, [, k]]) => /pollo|carne|atun/.test(k)));
+    if (!c.length) c = lista.filter((r) => r.alergenos.length === 0);
+    if (!c.length) c = lista;
+    return [...c].sort((a, b) => puntuar(b) - puntuar(a));
+  }
+  const pools = { desayuno: pool(RECETAS_DESAYUNO), almuerzo: pool(RECETAS_DEMO), cena: pool([...RECETAS_DEMO].reverse()) };
+
+  const usados = new Set(evitar);
+  function elegir(tipo, i) {
+    const lista = pools[tipo];
+    const libres = lista.filter((r) => !usados.has(r.platillo.toLowerCase()));
+    const fuente = libres.length ? libres : lista;
+    const r = diaNumero ? fuente[Math.floor(Math.random() * fuente.length)] : fuente[0] || lista[i % lista.length];
+    usados.add(r.platillo.toLowerCase());
+    return r;
   }
 
   const escala = personas / 2;
   const plan = [];
   for (let i = 0; i < dias; i++) {
-    const r = candidatas[i % candidatas.length];
-    const ingredientes = r.ingredientes.map(([cantidad, [cat, clave], factor]) => ({
-      nombre: cantidad.replace(/^[\d/.,\s]+(g|kg|cdas?|latas?|paquetes?)?\s*(de\s+)?/i, "").trim() || cantidad,
-      cantidad: escala === 1 ? cantidad : `${cantidad} ×${escala.toFixed(1).replace(".0", "")}`,
-      precio_estimado: +(PRECIOS_REFERENCIA[cat][clave] * factor * escala).toFixed(2)
-    }));
-    const costo = +ingredientes.reduce((s, x) => s + x.precio_estimado, 0).toFixed(2);
-    plan.push({
-      dia: diaNumero || i + 1,
-      platillo: r.platillo,
-      descripcion: r.descripcion,
-      tiempo_preparacion_min: r.tiempo,
-      porciones: personas,
-      costo_dia: costo,
-      ingredientes,
-      pasos: r.pasos,
-      consejo_ahorro: "Compra a granel los básicos (arroz, legumbres, aceite) para reducir el costo por porción."
+    const recetas = comidas.map((tipo) => {
+      const r = elegir(tipo, i);
+      const ingredientes = r.ingredientes.map(([cantidad, [cat, clave], factor]) => ({
+        nombre: nombreIngrediente(cantidad),
+        cantidad: escalarCantidad(cantidad, escala),
+        precio_estimado: +(PRECIOS_REFERENCIA[cat][clave] * factor * escala).toFixed(2)
+      }));
+      return {
+        tipo,
+        platillo: r.platillo,
+        descripcion: r.descripcion,
+        tiempo_preparacion_min: r.tiempo,
+        porciones: personas,
+        costo: +ingredientes.reduce((s, x) => s + x.precio_estimado, 0).toFixed(2),
+        ingredientes,
+        pasos: r.pasos,
+        consejo_ahorro: "Compra a granel los básicos (arroz, legumbres, aceite) para bajar el costo por porción."
+      };
     });
+    plan.push({ dia: diaNumero || i + 1, costo_dia: +recetas.reduce((s, r) => s + r.costo, 0).toFixed(2), comidas: recetas });
   }
 
-  const total = +plan.reduce((s, d) => s + d.costo_dia, 0).toFixed(2);
   return {
     resumen: {
       presupuesto_total: presupuesto,
-      costo_total: total,
+      costo_total: +plan.reduce((s, d) => s + d.costo_dia, 0).toFixed(2),
       moneda,
-      comentario: `Plan de demostración generado localmente (precios de referencia en USD${moneda !== "USD" ? ", sin conversión" : ""}). Activa la IA para un menú personalizado.`
+      comentario: `Plan de ejemplo generado sin IA con precios de referencia en USD${moneda !== "USD" ? " (sin convertir a tu moneda)" : ""}.`
     },
     dias: plan
   };
