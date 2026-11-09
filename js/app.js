@@ -77,6 +77,7 @@
   /* ================================================================== */
   function actualizarConexion() {
     const el = $("#conexion"), txt = $("#conexionTexto");
+    if (!el || !txt) return; // el indicador ya no se muestra en la barra superior
     let estado = "demo", texto = "Recetas de ejemplo";
     if (!ajustes.demo && claveActiva()) { estado = "ia"; texto = "Gemini conectado"; }
     else if (!ajustes.demo && enServidorWeb()) { estado = "servidor"; texto = "IA en servidor"; }

@@ -67,7 +67,10 @@ body {
   color: var(--ink); background: var(--linen); min-height: 100vh; display: flex; flex-direction: column;
 }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--wood); z-index: 30; }
-main { flex: 1; }
+/* La parte visible (portada o planificador) se estira hasta el pie: sin franja vacía cuando hay poco contenido. */
+main { flex: 1; display: flex; flex-direction: column; }
+#planificador:not([hidden]) { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; }
+main:has(#resultados:not([hidden])) #planificador { flex: 0 0 auto; }
 h1, h2, h3 { font-family: var(--f-display); font-weight: 400; line-height: 1.1; margin: 0; text-wrap: balance; letter-spacing: -.005em; }
 p { margin: 0; }
 img { max-width: 100%; display: block; }
