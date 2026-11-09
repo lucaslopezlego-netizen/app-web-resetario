@@ -48,7 +48,9 @@ Sin configurar nada, las cuentas se guardan solo en el navegador de cada disposi
 
 1. Crea un proyecto en https://supabase.com (plan gratuito).
 2. En **SQL Editor → New query**, pega el contenido de `supabase/schema.sql` y pulsa **Run**. Crea las tablas `preferencias` y `menus` con seguridad por filas (cada persona solo ve lo suyo).
-3. En **Project Settings → API** copia **Project URL** y la clave **anon public** y pégalas en `js/supabase-config.js`. Son valores públicos por diseño; nunca uses la clave `service_role`.
+3. Dale a la app la URL y la clave pública (anon / publishable) de una de estas dos formas:
+   - **Con Vercel (recomendado):** conecta Supabase a tu proyecto de Vercel con la integración oficial. Crea solas las variables `SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`, y la app las lee desde `/api/config` (`api/config.js`), que nunca entrega la clave `service_role`. Después de conectar, vuelve a desplegar.
+   - **Sin Vercel:** pega **Project URL** y la clave **anon public** en `js/supabase-config.js`. Son valores públicos por diseño; nunca uses la clave `service_role`.
 4. En **Authentication → URL Configuration**, pon en **Site URL** la dirección donde publiques la app (por ejemplo la de Vercel), para que funcione el enlace del correo de confirmación.
 5. Opcional: si no quieres que se pida confirmar el correo, desactiva **Authentication → Providers → Email → Confirm email**.
 
@@ -75,7 +77,8 @@ supabase/schema.sql     Tablas y reglas de seguridad para Supabase
 js/demo.js              Recetas de ejemplo sin IA
 js/app.js               Lógica de la interfaz
 js/config.example.js    Plantilla de configuración local
-api/generar.js          Función de Vercel que guarda la clave
+api/generar.js          Función de Vercel que guarda la clave de Gemini
+api/config.js           Función de Vercel que entrega la URL y la clave pública de Supabase
 ```
 
 Fotos: [Unsplash](https://unsplash.com).

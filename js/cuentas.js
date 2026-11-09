@@ -113,8 +113,7 @@ const EcoCuentas = (() => {
   /* ================================================================== */
   /* Modo Supabase                                                       */
   /* ================================================================== */
-  const cfg = (typeof window !== "undefined" && window.ECOMENU_SUPABASE) || {};
-  const conSupabase = !!(cfg.url && cfg.anonKey && typeof window !== "undefined" && window.supabase?.createClient);
+  const cfg = { ...((typeof window !== "undefined" && window.ECOMENU_SUPABASE) || {}) };
   let sb = null, usuarioSb = null;
 
   /** Traduce los errores de Supabase Auth a mensajes claros. */
@@ -292,10 +291,46 @@ const EcoCuentas = (() => {
     almacen: (id) => almacenLocal(id, programarSubida)
   };
 
-  const motor = conSupabase ? nube : local;
+  let motor = local, modo = "local", preparado = null;
+
+  /**
+   * Decide el modo antes de usar las cuentas. Usa js/supabase-config.js; si falta la URL o la clave
+   * y la app está publicada, las pide a /api/config (variables que la integración Supabase ↔ Vercel crea).
+   */
+  function preparar() {
+    if (preparado) return preparado;
+    preparado = (async () => {
+      const web = typeof location !== "undefined" && /^https?:$/.test(location.protocol);
+      if ((!cfg.url || !cfg.anonKey) && web) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 4000);
+          const res = await fetch("api/config", { signal: ctrl.signal, headers: { Accept: "application/json" } });
+          clearTimeout(t);
+          if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
+            const data = await res.json();
+            if (data.supabase?.url && (!cfg.url || cfg.url === data.supabase.url)) {
+              cfg.url = data.supabase.url;
+              cfg.anonKey = cfg.anonKey || data.supabase.anonKey;
+            }
+            servidor.gemini = !!data.gemini;
+          }
+        } catch { /* sin /api/config: se sigue con lo que haya */ }
+      }
+      if (cfg.url && cfg.anonKey && typeof window !== "undefined" && window.supabase?.createClient) {
+        motor = nube; modo = "supabase";
+      }
+      return modo;
+    })();
+    return preparado;
+  }
+  const servidor = { gemini: null };
 
   return {
-    modo: conSupabase ? "supabase" : "local",
+    preparar,
+    get modo() { return modo; },
+    /** true/false si /api/config dijo si hay clave de Gemini en el servidor; null si no se sabe. */
+    get geminiEnServidor() { return servidor.gemini; },
     crear: (d) => motor.crear(d),
     entrar: (d) => motor.entrar(d),
     restaurar: () => motor.restaurar(),

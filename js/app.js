@@ -994,6 +994,7 @@
     $$("#formAuth [aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
     btn.disabled = true;
     try {
+      await EcoCuentas.preparar();
       const datos = { nombre: $("#authNombre").value, correo: $("#authCorreo").value, clave: $("#authClave").value };
       const u = modoAuth === "crear" ? await EcoCuentas.crear(datos) : await EcoCuentas.entrar(datos);
       btn.textContent = "Cargando tus menús…";
@@ -1187,6 +1188,7 @@
     const fp = $("#factPrecios");
     if (fp) fp.textContent = Object.values(PRECIOS_REFERENCIA).reduce((s2, g) => s2 + Object.keys(g).length, 0);
     ["eco.plan", "eco.plan2", "eco.datos"].forEach((k) => store.del(k)); // formatos anteriores, sin cuentas
+    await EcoCuentas.preparar();
     if (EcoCuentas.modo === "supabase") {
       $("#notaSesion").textContent = "Tu cuenta funciona en todos tus dispositivos y la sesión queda guardada en este.";
     }

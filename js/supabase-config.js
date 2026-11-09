@@ -12,6 +12,6 @@
  * Si los dejas vacíos, la app usa cuentas guardadas solo en este dispositivo.
  */
 window.ECOMENU_SUPABASE = window.ECOMENU_SUPABASE || {
-  url: "",
-  anonKey: ""
+  url: "https://dhwduiwkyroepfhgykze.supabase.co",
+  anonKey: "" // si queda vacío y la app está en Vercel, se toma de las variables de la integración con Supabase
 };
