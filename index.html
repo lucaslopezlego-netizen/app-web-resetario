@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="EcoMenú IA: planifica tus comidas según tu presupuesto, gustos y alergias con Inteligencia Artificial (Gemini)." />
+  <meta name="theme-color" content="#0b6b3a" />
+  <title>EcoMenú IA · Cocina inteligente por presupuesto</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥗</text></svg>" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true">🥗</span>
+        <div>
+          <h1 class="brand-name">EcoMenú <span class="brand-accent">IA</span></h1>
+          <p class="brand-tagline">Cocina inteligente ajustada a tu presupuesto</p>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnConfig" aria-expanded="false" aria-controls="configPanel">
+        <span aria-hidden="true">⚙️</span> API
+      </button>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+
+    <!-- ===== Panel de configuración de la API ===== -->
+    <section id="configPanel" class="card config-panel" hidden aria-labelledby="configTitle">
+      <h2 id="configTitle" class="card-title">Conexión con Gemini (Google AI Studio)</h2>
+      <p class="muted">
+        Obtén tu clave gratuita en
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/app/apikey</a>.
+        La clave se usa solo desde tu navegador para llamar a la API de Google.
+      </p>
+
+      <div class="field">
+        <label for="apiKey">API Key de Gemini</label>
+        <div class="input-group">
+          <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="AIza..." />
+          <button type="button" class="btn btn-ghost btn-sm" id="btnToggleKey" aria-label="Mostrar clave">👁️</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="modelo">Modelo</label>
+        <select id="modelo">
+          <option value="gemini-2.5-flash" selected>gemini-2.5-flash (recomendado)</option>
+          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (más rápido)</option>
+          <option value="gemini-2.5-pro">gemini-2.5-pro (más preciso)</option>
+        </select>
+        <input type="text" id="modeloCustom" placeholder="…u otro modelo (opcional), ej. gemini-3-flash" spellcheck="false" />
+      </div>
+
+      <label class="checkbox">
+        <input type="checkbox" id="recordarKey" />
+        <span>Recordar clave en este dispositivo (localStorage)</span>
+      </label>
+
+      <div class="actions-row">
+        <button type="button" class="btn btn-primary btn-sm" id="btnGuardarConfig">Guardar</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnBorrarKey">Borrar clave</button>
+      </div>
+      <p class="hint">
+        ⚠️ Para un sitio público en producción, no expongas tu clave en el frontend:
+        usa un pequeño proxy/backend. Esta app está pensada para uso personal.
+      </p>
+    </section>
+
+    <!-- ===== Formulario ===== -->
+    <section class="card" aria-labelledby="formTitle">
+      <h2 id="formTitle" class="card-title">Planifica tu menú</h2>
+
+      <form id="formMenu" novalidate>
+        <div class="grid-2">
+          <div class="field">
+            <label for="presupuesto">Presupuesto total <span class="req" aria-hidden="true">*</span></label>
+            <div class="input-group">
+              <select id="moneda" aria-label="Moneda" class="select-currency">
+                <option value="USD" selected>USD $</option>
+                <option value="EUR">EUR €</option>
+                <option value="MXN">MXN $</option>
+                <option value="ARS">ARS $</option>
+                <option value="COP">COP $</option>
+                <option value="CLP">CLP $</option>
+                <option value="PEN">PEN S/</option>
+                <option value="BOB">BOB Bs</option>
+                <option value="UYU">UYU $</option>
+                <option value="GTQ">GTQ Q</option>
+                <option value="DOP">DOP $</option>
+              </select>
+              <input type="number" id="presupuesto" inputmode="decimal" min="1" step="0.01" placeholder="Ej: 40" required />
+            </div>
+            <p class="error-msg" id="errPresupuesto" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="dias">Días a planificar <span class="req" aria-hidden="true">*</span></label>
+            <select id="dias" required>
+              <option value="1">1 día</option>
+              <option value="2">2 días</option>
+              <option value="3" selected>3 días</option>
+              <option value="4">4 días</option>
+              <option value="5">5 días</option>
+              <option value="6">6 días</option>
+              <option value="7">7 días</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="personas">Personas</label>
+            <select id="personas">
+              <option value="1">1 persona</option>
+              <option value="2" selected>2 personas</option>
+              <option value="3">3 personas</option>
+              <option value="4">4 personas</option>
+              <option value="5">5 personas</option>
+              <option value="6">6 personas</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="comida">Comida del día</label>
+            <select id="comida">
+              <option value="almuerzo" selected>Almuerzo</option>
+              <option value="cena">Cena</option>
+              <option value="desayuno">Desayuno</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="gustosInput">Gustos / Preferencias</label>
+          <div class="chips" id="gustosSugeridos" role="group" aria-label="Sugerencias de gustos">
+            <button type="button" class="chip" data-value="Comida casera">Casera</button>
+            <button type="button" class="chip" data-value="Vegetariana">Vegetariana</button>
+            <button type="button" class="chip" data-value="Rápida (menos de 30 min)">Rápida</button>
+            <button type="button" class="chip" data-value="Italiana">Italiana</button>
+            <button type="button" class="chip" data-value="Mexicana">Mexicana</button>
+            <button type="button" class="chip" data-value="Saludable / baja en grasa">Saludable</button>
+            <button type="button" class="chip" data-value="Alta en proteína">Proteica</button>
+            <button type="button" class="chip" data-value="Picante">Picante</button>
+          </div>
+          <div class="tag-input" data-target="gustos">
+            <ul class="tags" id="gustosTags" aria-live="polite"></ul>
+            <input type="text" id="gustosInput" placeholder="Escribe y pulsa Enter (ej: asiática)" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="alergiasInput">Alergias / Restricciones</label>
+          <div class="chips" id="alergiasSugeridas" role="group" aria-label="Sugerencias de alergias">
+            <button type="button" class="chip chip-danger" data-value="Gluten">Gluten</button>
+            <button type="button" class="chip chip-danger" data-value="Lactosa">Lactosa</button>
+            <button type="button" class="chip chip-danger" data-value="Frutos secos">Frutos secos</button>
+            <button type="button" class="chip chip-danger" data-value="Mariscos">Mariscos</button>
+            <button type="button" class="chip chip-danger" data-value="Huevo">Huevo</button>
+            <button type="button" class="chip chip-danger" data-value="Cerdo">Cerdo</button>
+          </div>
+          <div class="tag-input" data-target="alergias">
+            <ul class="tags tags-danger" id="alergiasTags" aria-live="polite"></ul>
+            <input type="text" id="alergiasInput" placeholder="Escribe y pulsa Enter (ej: soja)" autocomplete="off" />
+          </div>
+        </div>
+
+        <details class="advanced">
+          <summary>Opciones avanzadas</summary>
+          <div class="field">
+            <label for="notas">Notas extra para la IA</label>
+            <textarea id="notas" rows="2" placeholder="Ej: tengo arroz y aceite en casa, no tengo horno…"></textarea>
+          </div>
+          <label class="checkbox">
+            <input type="checkbox" id="modoDemo" />
+            <span>Modo demo (sin IA, usa recetas de ejemplo locales)</span>
+          </label>
+        </details>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="btnGenerar">
+          <span class="btn-label">✨ Generar Menú con IA</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <p class="status-msg" id="statusMsg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <!-- ===== Resultados ===== -->
+    <section id="resultados" class="resultados" hidden aria-labelledby="resTitle" tabindex="-1">
+      <div class="card resumen">
+        <div class="resumen-head">
+          <h2 id="resTitle" class="card-title">Tu plan de comidas</h2>
+          <div class="actions-row">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnExpandir">Expandir todo</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnImprimir">🖨️ Imprimir</button>
+          </div>
+        </div>
+        <div id="resumenContenido"></div>
+      </div>
+
+      <div id="diasContenedor" class="dias"></div>
+
+      <details class="card compras" id="listaCompras">
+        <summary class="day-summary">
+          <span class="day-title">🛒 Lista de compras consolidada</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="day-body" id="comprasContenido"></div>
+      </details>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div class="container">
+      <p>EcoMenú IA · Precios estimados de referencia, pueden variar según tu zona.</p>
+    </div>
+  </footer>
+
+  <script src="js/precios.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
