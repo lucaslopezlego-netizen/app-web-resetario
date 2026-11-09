@@ -42,9 +42,22 @@ La página llama a `/api/generar` (`api/generar.js`), que usa la clave desde el 
 
 Por defecto prueba en orden `gemini-3.5-flash`, `gemini-3.1-flash-lite` y `gemini-flash-lite-latest`. Si uno está saturado o no existe, pasa al siguiente. Puedes fijar uno en Ajustes.
 
-## Sobre las cuentas
+## Cuentas en todos tus dispositivos (Supabase)
 
-Las cuentas, la sesión y los menús guardados viven en el navegador de cada dispositivo (localStorage). No hay servidor de usuarios: una cuenta creada en el celular no existe en la computadora, y borrar los datos del navegador borra las cuentas. La contraseña nunca se guarda: se guarda un hash PBKDF2-SHA256 con sal aleatoria. Para cuentas compartidas entre dispositivos haría falta un servicio de autenticación (por ejemplo Supabase o Firebase).
+Sin configurar nada, las cuentas se guardan solo en el navegador de cada dispositivo. Para que funcionen en el celular y en la computadora a la vez, conecta un proyecto gratuito de Supabase:
+
+1. Crea un proyecto en https://supabase.com (plan gratuito).
+2. En **SQL Editor → New query**, pega el contenido de `supabase/schema.sql` y pulsa **Run**. Crea las tablas `preferencias` y `menus` con seguridad por filas (cada persona solo ve lo suyo).
+3. En **Project Settings → API** copia **Project URL** y la clave **anon public** y pégalas en `js/supabase-config.js`. Son valores públicos por diseño; nunca uses la clave `service_role`.
+4. En **Authentication → URL Configuration**, pon en **Site URL** la dirección donde publiques la app (por ejemplo la de Vercel), para que funcione el enlace del correo de confirmación.
+5. Opcional: si no quieres que se pida confirmar el correo, desactiva **Authentication → Providers → Email → Confirm email**.
+
+Con Supabase activo:
+- La sesión la guarda Supabase en el navegador y se renueva sola; queda abierta hasta pulsar **Cerrar sesión**.
+- Preferencias del asistente y **Mis menús** se guardan primero en el dispositivo (la app responde al instante) y se suben a la nube en segundo plano. El menú lateral muestra si está sincronizado, guardando o sin conexión; lo creado sin internet se sube al volver.
+- La librería de Supabase va incluida en `js/vendor/` (licencia MIT), sin depender de un CDN.
+
+Sin Supabase, la contraseña nunca se guarda: se guarda un hash PBKDF2-SHA256 con sal aleatoria.
 
 ## Estructura
 
@@ -55,7 +68,10 @@ js/precios.js           PRECIOS_REFERENCIA (precios base en USD)
 js/ecomenu-core.js      Prompts, esquema JSON y llamada a Gemini (navegador y servidor)
 js/fotos.js             Fotos de Unsplash según el tipo de plato
 js/compras.js           Lista de compras: pasillos, suma de cantidades y texto para copiar
-js/cuentas.js           Cuentas locales, sesión y datos por usuario
+js/cuentas.js           Cuentas (Supabase o locales), sesión y sincronización de datos
+js/supabase-config.js   URL y clave pública de tu proyecto de Supabase
+js/vendor/              Librería oficial supabase-js 2.45.4 (MIT)
+supabase/schema.sql     Tablas y reglas de seguridad para Supabase
 js/demo.js              Recetas de ejemplo sin IA
 js/app.js               Lógica de la interfaz
 js/config.example.js    Plantilla de configuración local

@@ -51,7 +51,7 @@
           <button type="button" class="btn btn-primary btn-lg" data-auth="crear">Crear cuenta gratis</button>
           <button type="button" class="btn btn-ghost-light btn-lg" data-auth="entrar">Ya tengo cuenta</button>
         </div>
-        <p class="landing-note">Tu sesión queda guardada en este dispositivo.</p>
+        <p class="landing-note" id="notaSesion">Tu sesión queda guardada en este dispositivo.</p>
       </div>
     </section>
 
@@ -402,6 +402,7 @@
         <div class="drawer-user">
           <p class="drawer-name" id="menuNombre">Invitado</p>
           <p class="drawer-mail" id="menuCorreo"></p>
+          <p class="nube" id="estadoNube" data-estado="local" aria-live="polite">Cuenta guardada en este dispositivo</p>
         </div>
         <button type="button" class="icon-btn" id="cerrarMenu" aria-label="Cerrar menú">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -445,6 +446,8 @@
   <script src="js/ecomenu-core.js"></script>
   <script src="js/fotos.js"></script>
   <script src="js/compras.js"></script>
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/supabase-config.js"></script>
   <script src="js/cuentas.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/app.js"></script>

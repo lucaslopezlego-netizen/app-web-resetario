@@ -953,9 +953,11 @@
     $("#authEnviar").textContent = crear ? "Crear cuenta" : "Entrar";
     $("#authClave").setAttribute("autocomplete", crear ? "new-password" : "current-password");
     $("#authClave").placeholder = crear ? "Mínimo 6 caracteres" : "Tu contraseña";
+    const nube = EcoCuentas.modo === "supabase";
     $("#authNota").textContent = crear
-      ? "La cuenta y la sesión se guardan en este dispositivo."
-      : "Usa el correo y la contraseña con los que creaste tu cuenta en este dispositivo.";
+      ? (nube ? "Podrás entrar con esta cuenta desde cualquier dispositivo. La sesión queda guardada en este." : "La cuenta y la sesión se guardan en este dispositivo.")
+      : (nube ? "Usa el correo y la contraseña de tu cuenta de Eco Menú." : "Usa el correo y la contraseña con los que creaste tu cuenta en este dispositivo.");
+    $("#authError").classList.remove("info");
     $("#authError").hidden = true;
     $$("#formAuth [aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
   }
@@ -988,18 +990,24 @@
     try {
       const datos = { nombre: $("#authNombre").value, correo: $("#authCorreo").value, clave: $("#authClave").value };
       const u = modoAuth === "crear" ? await EcoCuentas.crear(datos) : await EcoCuentas.entrar(datos);
+      btn.textContent = "Cargando tus menús…";
+      await EcoCuentas.sincronizar();
       dlgAuth.close();
       $("#authClave").value = "";
       entrarComo(u);
       toast(modoAuth === "crear" ? `Bienvenido, ${u.nombre}. Tu cuenta está lista.` : `Hola de nuevo, ${u.nombre}`);
       $("#planificador").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (ex) {
+      const esInfo = ex.tipo === "info";
+      if (esInfo && modoAuth === "crear") fijarModoAuth("entrar");
       err.textContent = ex.message || "No se pudo completar. Vuelve a intentarlo.";
+      err.classList.toggle("info", esInfo);
       err.hidden = false;
       const campo = { nombre: "#authNombre", correo: "#authCorreo", clave: "#authClave" }[ex.campo];
-      if (campo) { $(campo).setAttribute("aria-invalid", "true"); $(campo).focus(); }
+      if (campo && !esInfo) { $(campo).setAttribute("aria-invalid", "true"); $(campo).focus(); }
     } finally {
       btn.disabled = false;
+      btn.textContent = modoAuth === "crear" ? "Crear cuenta" : "Entrar";
     }
   });
 
@@ -1040,16 +1048,40 @@
     renderMisMenus(); actualizarFacts();
   }
 
-  function cerrarSesion() {
-    EcoCuentas.salir();
+  /** Vuelve a la portada. `remoto` = la sesión se cerró en otra pestaña o expiró. */
+  function salirDeLaVista(nombre, remoto = false) {
     if (dlgMenu.open) dlgMenu.close();
-    const nombre = state.usuario?.nombre?.split(" ")[0];
     state.usuario = null; state.us = null; state.plan = null; state.menuId = null;
     state.datos = datosIniciales();
     mostrarVista();
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast(nombre ? `Hasta pronto, ${nombre}. Cerraste sesión.` : "Cerraste sesión.");
+    toast(remoto ? "Tu sesión se cerró. Vuelve a iniciar sesión." : nombre ? `Hasta pronto, ${nombre}. Cerraste sesión.` : "Cerraste sesión.");
   }
+
+  async function cerrarSesion() {
+    const btn = $("#btnSalir");
+    btn.disabled = true;
+    const nombre = state.usuario?.nombre?.split(" ")[0];
+    try { await EcoCuentas.salir(); } finally { btn.disabled = false; }
+    salirDeLaVista(nombre);
+  }
+  EcoCuentas.onSalida(() => { if (state.usuario) salirDeLaVista(null, true); });
+
+  /** Estado de la nube en el menú lateral. */
+  const TEXTO_NUBE = {
+    local: "Cuenta guardada en este dispositivo",
+    guardando: "Guardando en la nube…",
+    sincronizado: "Sincronizado en la nube",
+    "sin-conexion": "Sin conexión: se guardará al volver internet"
+  };
+  function pintarNube(estado) {
+    const el = $("#estadoNube"); if (!el) return;
+    const e = EcoCuentas.modo === "supabase" ? estado || "sincronizado" : "local";
+    el.textContent = TEXTO_NUBE[e];
+    el.dataset.estado = e;
+  }
+  EcoCuentas.onEstado(pintarNube);
+
   $("#btnSalir").addEventListener("click", cerrarSesion);
 
   /* ================================================================== */
@@ -1145,13 +1177,23 @@
   /* ================================================================== */
   /* Inicio                                                              */
   /* ================================================================== */
-  function iniciar() {
+  async function iniciar() {
     const fp = $("#factPrecios");
     if (fp) fp.textContent = Object.values(PRECIOS_REFERENCIA).reduce((s2, g) => s2 + Object.keys(g).length, 0);
     ["eco.plan", "eco.plan2", "eco.datos"].forEach((k) => store.del(k)); // formatos anteriores, sin cuentas
-    const u = EcoCuentas.actual();
-    if (u) entrarComo(u);
-    else mostrarVista();
+    if (EcoCuentas.modo === "supabase") {
+      $("#notaSesion").textContent = "Tu cuenta funciona en todos tus dispositivos y la sesión queda guardada en este.";
+    }
+    pintarNube();
+    const u = await EcoCuentas.restaurar();
+    if (!u) { mostrarVista(); return; }
+    entrarComo(u);                         // muestra al instante lo guardado en el dispositivo
+    if (EcoCuentas.modo === "supabase") {  // y luego trae lo último de la nube
+      await EcoCuentas.sincronizar();
+      if (state.usuario?.id !== u.id) return;
+      if (!state.generando && state.paso === 1) entrarComo(u); // no interrumpe si ya empezó el asistente
+      else { renderMisMenus(); actualizarFacts(); }
+    }
   }
   iniciar();
 })();

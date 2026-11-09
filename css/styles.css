@@ -643,3 +643,12 @@ dialog::backdrop { background: rgba(20, 12, 8, .6); backdrop-filter: blur(4px); 
 }
 .menu-del:hover { color: var(--danger); border-color: var(--line); }
 .menu-del.confirmar { background: var(--danger); color: #fff; font-size: var(--t-xs); font-weight: 700; }
+
+/* Estado de la cuenta en la nube */
+.nube { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: .72rem; font-weight: 600; color: var(--muted); }
+.nube::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+.nube[data-estado="sincronizado"]::before { background: var(--ok); }
+.nube[data-estado="guardando"]::before { background: var(--warn); animation: parpadeo 1s infinite; }
+.nube[data-estado="sin-conexion"] { color: var(--danger); }
+.nube[data-estado="sin-conexion"]::before { background: var(--danger); }
+.form-status.info { color: var(--walnut); background: var(--accent-soft); padding: 10px 12px; border-radius: var(--r-sm); }
