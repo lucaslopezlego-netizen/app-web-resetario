@@ -1,5 +1,5 @@
 /**
- * EcoMenú IA — Fotos reales de platos (Unsplash, licencia libre).
+ * Eco Menú — Fotos reales de platos (Unsplash, licencia libre).
  * Se elige una foto según palabras clave del nombre del platillo y sus ingredientes.
  */
 const FOTOS_ID = {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>EcoMenú IA</title>
+  <title>Eco Menú</title>
   <meta name="description" content="Planifica tus comidas de la semana según tu presupuesto, gustos y alergias, con recetas generadas por Gemini." />
   <meta name="theme-color" content="#1e140e" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%235b3a22'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23e8c79f' stroke-width='3'/%3E%3C/svg%3E" />
@@ -14,37 +14,87 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <a class="skip-link" href="#asistente">Saltar al planificador</a>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
 
   <!-- ================= Barra superior ================= -->
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="wordmark" href="#" aria-label="EcoMenú IA, inicio">
+      <a class="wordmark" href="#" id="logo" aria-label="Eco Menú, inicio">
         <svg class="wordmark-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" /><circle cx="20" cy="20" r="11" /><path d="M7 33 33 7" /></svg>
-        <span>EcoMenú <em>IA</em></span>
+        <span>Eco <em>Menú</em></span>
       </a>
-      <div class="topbar-actions">
-        <span class="conexion" id="conexion" data-estado="demo"><span class="conexion-dot" aria-hidden="true"></span><span id="conexionTexto">Modo demo</span></span>
-        <button type="button" class="icon-btn" id="btnAjustes" aria-haspopup="dialog" aria-label="Ajustes de la IA">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+      <div class="topbar-actions" id="accionesInvitado">
+        <button type="button" class="btn btn-ghost-light btn-sm" data-auth="entrar">Iniciar sesión</button>
+      </div>
+      <div class="topbar-actions" id="accionesUsuario" hidden>
+        <span class="conexion" id="conexion" data-estado="demo"><span class="conexion-dot" aria-hidden="true"></span><span id="conexionTexto">Recetas de ejemplo</span></span>
+        <button type="button" class="menu-btn" id="btnMenu" aria-haspopup="dialog" aria-controls="menuLateral">
+          <span class="avatar" id="avatarTop" aria-hidden="true">?</span>
+          <span class="menu-btn-txt">Menú</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
       </div>
     </div>
   </header>
 
-  <main>
-    <!-- ================= Portada + asistente ================= -->
-    <section class="hero">
+  <main id="main">
+    <!-- ================= Portada (sin sesión) ================= -->
+    <section class="hero landing" id="inicio" aria-labelledby="inicioTitulo">
+      <div class="hero-photos" aria-hidden="true">
+        <img src="https://images.unsplash.com/photo-1637909490319-95f2cd3ac3e3?auto=format&fit=crop&w=1400&q=70" alt="" fetchpriority="high" onerror="this.remove()" />
+      </div>
+      <div class="wrap landing-inner">
+        <p class="eyebrow">Cocina por presupuesto</p>
+        <h1 id="inicioTitulo">Come bien toda la semana con el dinero que tienes.</h1>
+        <p class="lede">Eco Menú arma tu desayuno, almuerzo y cena con recetas reales, precios estimados y la lista de compras lista para el mercado.</p>
+        <div class="landing-cta">
+          <button type="button" class="btn btn-primary btn-lg" data-auth="crear">Crear cuenta gratis</button>
+          <button type="button" class="btn btn-ghost-light btn-lg" data-auth="entrar">Ya tengo cuenta</button>
+        </div>
+        <p class="landing-note">Tu sesión queda guardada en este dispositivo.</p>
+      </div>
+    </section>
+
+    <section class="how" id="comoFunciona" aria-labelledby="comoTitulo">
+      <div class="wrap">
+        <p class="eyebrow eyebrow-dark">Cómo usarlo</p>
+        <h2 id="comoTitulo">Tu menú en cuatro pasos</h2>
+        <ol class="how-steps">
+          <li>
+            <img src="https://images.unsplash.com/photo-1563321442-a7f77abda173?auto=format&fit=crop&w=600&h=400&q=60" alt="" loading="lazy" />
+            <div><h3>Pon tu presupuesto</h3><p>Escribe cuánto quieres gastar en total. Te decimos cuánto toca por plato.</p></div>
+          </li>
+          <li>
+            <img src="https://images.unsplash.com/photo-1787559793297-8494fb140c9f?auto=format&fit=crop&w=600&h=400&q=60" alt="" loading="lazy" />
+            <div><h3>Elige días y comidas</h3><p>Los días que quieras, aunque no sean seguidos, y desayuno, almuerzo o cena.</p></div>
+          </li>
+          <li>
+            <img src="https://images.unsplash.com/photo-1791208843014-69ab842736d0?auto=format&fit=crop&w=600&h=400&q=60" alt="" loading="lazy" />
+            <div><h3>Cuéntanos qué comes</h3><p>Marca tus gustos y lo que no puedes comer. Esos alérgenos no entran en tus recetas.</p></div>
+          </li>
+          <li>
+            <img src="https://images.unsplash.com/photo-1708184528306-f75a0a5118ee?auto=format&fit=crop&w=600&h=400&q=60" alt="" loading="lazy" />
+            <div><h3>Cocina y compra</h3><p>Recibes recetas paso a paso, modo cocina con temporizador y la lista de compras por pasillo.</p></div>
+          </li>
+        </ol>
+        <div class="how-cta">
+          <button type="button" class="btn btn-primary" data-auth="crear">Empezar ahora</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Planificador (con sesión) ================= -->
+    <section class="hero" id="planificador" hidden>
       <div class="hero-photos" aria-hidden="true">
         <img src="https://images.unsplash.com/photo-1637909490319-95f2cd3ac3e3?auto=format&fit=crop&w=1400&q=70" alt="" fetchpriority="high" onerror="this.remove()" />
       </div>
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Cocina por presupuesto</p>
-          <h1>Una semana de buena comida con el dinero que tienes.</h1>
+          <p class="eyebrow" id="saludo">Hola</p>
+          <h1>¿Qué cocinamos esta semana?</h1>
           <p class="lede">Dinos cuánto puedes gastar, qué te gusta y qué no puedes comer. Gemini arma el desayuno, el almuerzo y la cena que elijas para cada día, con ingredientes, precios y pasos, sin pasarse del presupuesto.</p>
           <ul class="hero-facts">
-            <li><strong>1 a 7</strong><span>días por plan</span></li>
+            <li><strong id="factMenus">0</strong><span>menús guardados</span></li>
             <li><strong id="factPrecios">33</strong><span>precios de referencia</span></li>
             <li><strong>3</strong><span>comidas al día, a tu elección</span></li>
           </ul>
@@ -96,19 +146,20 @@
 
             <!-- Paso 2 -->
             <div class="step" data-step="2" role="group" aria-labelledby="paso2" hidden>
-              <h2 class="step-title" id="paso2">¿Para cuántos días y personas?</h2>
-              <p class="step-sub">Toca el último día de tu plan. Empezamos el lunes.</p>
+              <h2 class="step-title" id="paso2">¿Qué días, para cuántos y qué comidas?</h2>
+              <p class="step-sub">Toca los días que quieras planificar. No tienen que ser seguidos.</p>
 
-              <div class="week" id="semana" role="radiogroup" aria-label="Días a planificar">
-                <button type="button" role="radio" data-dias="1"><b>L</b><span>1</span></button>
-                <button type="button" role="radio" data-dias="2"><b>M</b><span>2</span></button>
-                <button type="button" role="radio" data-dias="3"><b>X</b><span>3</span></button>
-                <button type="button" role="radio" data-dias="4"><b>J</b><span>4</span></button>
-                <button type="button" role="radio" data-dias="5"><b>V</b><span>5</span></button>
-                <button type="button" role="radio" data-dias="6"><b>S</b><span>6</span></button>
-                <button type="button" role="radio" data-dias="7"><b>D</b><span>7</span></button>
+              <div class="week" id="semana" role="group" aria-label="Días a planificar">
+                <button type="button" data-dia="0" aria-pressed="false" aria-label="Lunes"><b>L</b><span>Lun</span></button>
+                <button type="button" data-dia="1" aria-pressed="false" aria-label="Martes"><b>M</b><span>Mar</span></button>
+                <button type="button" data-dia="2" aria-pressed="false" aria-label="Miércoles"><b>X</b><span>Mié</span></button>
+                <button type="button" data-dia="3" aria-pressed="false" aria-label="Jueves"><b>J</b><span>Jue</span></button>
+                <button type="button" data-dia="4" aria-pressed="false" aria-label="Viernes"><b>V</b><span>Vie</span></button>
+                <button type="button" data-dia="5" aria-pressed="false" aria-label="Sábado"><b>S</b><span>Sáb</span></button>
+                <button type="button" data-dia="6" aria-pressed="false" aria-label="Domingo"><b>D</b><span>Dom</span></button>
               </div>
               <p class="week-label" id="semanaTexto">Plan de 3 días</p>
+              <p class="field-error" id="errDias" role="alert"></p>
 
               <div class="row-split">
                 <span class="label-strong" id="personasLabel">Personas</span>
@@ -119,10 +170,7 @@
                 </div>
               </div>
 
-              <div class="label-row">
-                <p class="label-strong" id="comidasLabel">¿Qué comidas planificamos?</p>
-                <button type="button" class="link-btn" id="todasComidas">Elegir las tres</button>
-              </div>
+              <p class="label-strong" id="comidasLabel">¿Qué comidas planificamos? <span class="optional">elige una o varias</span></p>
               <div class="photo-options photo-options-3" role="group" aria-labelledby="comidasLabel" id="comidas">
                 <label class="photo-opt">
                   <input type="checkbox" name="comidas" value="desayuno" />
@@ -219,10 +267,11 @@
         <div class="results-head">
           <div>
             <p class="eyebrow eyebrow-dark" id="resEyebrow">Tu plan</p>
+            <p class="saved-pill" id="resGuardado" hidden>Guardado en Mis menús</p>
             <h2 id="resTitulo">Menú de 3 días</h2>
           </div>
           <div class="results-actions">
-            <button type="button" class="btn btn-quiet" id="btnNuevo">Nuevo plan</button>
+            <button type="button" class="btn btn-quiet" id="btnNuevo">Nuevo menú</button>
             <button type="button" class="btn btn-primary" id="btnCopiar">Copiar lista de compras</button>
           </div>
         </div>
@@ -248,7 +297,7 @@
 
   <footer class="footer">
     <div class="wrap">
-      <p>EcoMenú IA · Recetas generadas con Gemini · Fotos de <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></p>
+      <p>Eco Menú · Recetas generadas con Gemini · Fotos de <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></p>
     </div>
   </footer>
 
@@ -309,6 +358,86 @@
     </form>
   </dialog>
 
+  <!-- ================= Cuenta: crear / iniciar sesión ================= -->
+  <dialog class="sheet auth" id="auth" aria-labelledby="authTitulo">
+    <div class="sheet-inner">
+      <div class="sheet-head">
+        <h2 id="authTitulo">Crear cuenta</h2>
+        <button type="button" class="icon-btn" id="cerrarAuth" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="auth-tabs" role="tablist" aria-label="Tipo de acceso">
+        <button type="button" role="tab" id="tabCrear" data-modo="crear" aria-selected="true">Crear cuenta</button>
+        <button type="button" role="tab" id="tabEntrar" data-modo="entrar" aria-selected="false">Iniciar sesión</button>
+      </div>
+      <form id="formAuth" class="auth-form" novalidate>
+        <div class="field" id="campoNombre">
+          <label class="label-strong" for="authNombre">Tu nombre</label>
+          <input type="text" id="authNombre" autocomplete="given-name" maxlength="40" placeholder="Así te saludaremos" />
+        </div>
+        <div class="field">
+          <label class="label-strong" for="authCorreo">Correo</label>
+          <input type="email" id="authCorreo" autocomplete="email" inputmode="email" placeholder="tu@correo.com" />
+        </div>
+        <div class="field">
+          <label class="label-strong" for="authClave">Contraseña</label>
+          <div class="key-row">
+            <input type="password" id="authClave" autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" />
+            <button type="button" class="btn btn-quiet btn-sm" id="verClave">Mostrar</button>
+          </div>
+        </div>
+        <p class="form-status error" id="authError" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="authEnviar">Crear cuenta</button>
+        <p class="hint" id="authNota">La cuenta y la sesión se guardan en este dispositivo.</p>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- ================= Menú lateral ================= -->
+  <dialog class="drawer" id="menuLateral" aria-label="Menú">
+    <div class="drawer-inner">
+      <div class="drawer-head">
+        <span class="avatar avatar-lg" id="avatarMenu" aria-hidden="true">?</span>
+        <div class="drawer-user">
+          <p class="drawer-name" id="menuNombre">Invitado</p>
+          <p class="drawer-mail" id="menuCorreo"></p>
+        </div>
+        <button type="button" class="icon-btn" id="cerrarMenu" aria-label="Cerrar menú">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <nav class="drawer-nav" aria-label="Principal">
+        <p class="drawer-label">Planificar</p>
+        <button type="button" class="drawer-link" id="navNuevo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Nuevo menú</span>
+        </button>
+        <button type="button" class="drawer-link" id="navActual" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 10h16M9 5v14"/></svg>
+          <span>Menú abierto</span>
+        </button>
+
+        <div class="drawer-label-row">
+          <p class="drawer-label" id="misMenusLabel">Mis menús</p>
+          <span class="drawer-count" id="misMenusCount">0</span>
+        </div>
+        <div id="misMenus" aria-labelledby="misMenusLabel"></div>
+
+        <p class="drawer-label">Cuenta</p>
+        <button type="button" class="drawer-link" id="btnAjustes" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+          <span>Ajustes de la IA</span>
+        </button>
+        <button type="button" class="drawer-link drawer-link-danger" id="btnSalir">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
+          <span>Cerrar sesión</span>
+        </button>
+      </nav>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="js/config.local.js" onerror="this.remove()"></script>
@@ -316,6 +445,7 @@
   <script src="js/ecomenu-core.js"></script>
   <script src="js/fotos.js"></script>
   <script src="js/compras.js"></script>
+  <script src="js/cuentas.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/app.js"></script>
 </body>

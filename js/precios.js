@@ -1,5 +1,5 @@
 /**
- * EcoMenú IA — Base de datos local de precios de referencia (USD).
+ * Eco Menú — Base de datos local de precios de referencia (USD).
  * La IA recibe este objeto dentro del prompt del sistema para calcular costos.
  * Puedes ampliarlo o ajustarlo a los precios de tu zona.
  */

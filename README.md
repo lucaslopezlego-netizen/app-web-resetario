@@ -1,10 +1,15 @@
-# EcoMenú IA
+# Eco Menú
 
-Planificador de comidas por presupuesto. Un asistente de 5 pasos pregunta cuánto quieres gastar, cuántos días y personas, qué comidas planificar (desayuno, almuerzo y/o cena), qué te gusta y qué no puedes comer. Luego **Gemini (Google AI Studio)** arma una receta por cada comida de cada día, con ingredientes, precios y pasos, sin pasarse del presupuesto.
+Planificador de comidas por presupuesto. Después de crear una cuenta, un asistente de 5 pasos pregunta cuánto quieres gastar, qué días (no tienen que ser seguidos) y para cuántas personas, qué comidas planificar (desayuno, almuerzo y/o cena), qué te gusta y qué no puedes comer. Luego **Gemini (Google AI Studio)** arma una receta por cada comida de cada día, con ingredientes, precios y pasos, sin pasarse del presupuesto.
 
 HTML, CSS y JavaScript sin dependencias ni paso de compilación.
 
 ## Qué puedes hacer
+
+- **Cuentas:** portada con "Cómo usarlo", crear cuenta (nombre, correo y contraseña) o iniciar sesión (correo y contraseña). La app te saluda por tu nombre.
+- **Sesión en el dispositivo:** la sesión queda guardada hasta que pulses **Cerrar sesión** en el menú.
+- **Menú lateral:** Nuevo menú, **Mis menús** (cada menú generado se guarda solo, agrupado por semana y mes, con sus días, platos y costo; se puede abrir o eliminar), Ajustes de la IA y Cerrar sesión.
+- **Días sueltos:** elige cualquier combinación de días, por ejemplo lunes, miércoles y viernes.
 
 - **Asistente paso a paso:** presupuesto con deslizador y montos rápidos, un indicador de cuánto toca por plato, semana interactiva, personas, elección de desayuno, almuerzo y cena (una, dos o las tres), gustos con fotos de platos reales y alérgenos.
 - **Resultados:** anillo de presupuesto usado, barras de costo por día divididas por comida, una tarjeta por día y un selector Desayuno / Almuerzo / Cena con la receta completa de cada uno.
@@ -37,6 +42,10 @@ La página llama a `/api/generar` (`api/generar.js`), que usa la clave desde el 
 
 Por defecto prueba en orden `gemini-3.5-flash`, `gemini-3.1-flash-lite` y `gemini-flash-lite-latest`. Si uno está saturado o no existe, pasa al siguiente. Puedes fijar uno en Ajustes.
 
+## Sobre las cuentas
+
+Las cuentas, la sesión y los menús guardados viven en el navegador de cada dispositivo (localStorage). No hay servidor de usuarios: una cuenta creada en el celular no existe en la computadora, y borrar los datos del navegador borra las cuentas. La contraseña nunca se guarda: se guarda un hash PBKDF2-SHA256 con sal aleatoria. Para cuentas compartidas entre dispositivos haría falta un servicio de autenticación (por ejemplo Supabase o Firebase).
+
 ## Estructura
 
 ```
@@ -46,6 +55,7 @@ js/precios.js           PRECIOS_REFERENCIA (precios base en USD)
 js/ecomenu-core.js      Prompts, esquema JSON y llamada a Gemini (navegador y servidor)
 js/fotos.js             Fotos de Unsplash según el tipo de plato
 js/compras.js           Lista de compras: pasillos, suma de cantidades y texto para copiar
+js/cuentas.js           Cuentas locales, sesión y datos por usuario
 js/demo.js              Recetas de ejemplo sin IA
 js/app.js               Lógica de la interfaz
 js/config.example.js    Plantilla de configuración local

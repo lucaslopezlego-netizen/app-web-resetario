@@ -1,5 +1,5 @@
 /**
- * EcoMenú IA — Lógica de la interfaz.
+ * Eco Menú — Lógica de la interfaz.
  * Asistente de 5 pasos → generación con Gemini (directa, vía servidor o demo)
  * → resultados: cada día con desayuno, almuerzo y/o cena; "ya lo tengo en casa",
  *   cambiar una receta, modo cocina con temporizador y lista de compras por pasillo.
@@ -19,7 +19,8 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } },
     del(k) { try { localStorage.removeItem(k); } catch { /* sin almacenamiento */ } }
   };
-  const K = { datos: "eco.datos", plan: "eco.plan2", key: "eco.key", modelo: "eco.modelo", demo: "eco.demo" };
+  /** Claves globales del dispositivo (ajustes de IA). Los datos de cada persona van en su propio almacén. */
+  const K = { key: "eco.key", modelo: "eco.modelo", demo: "eco.demo" };
 
   const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
   const COMIDAS = core.COMIDAS; // ["desayuno", "almuerzo", "cena"]
@@ -41,16 +42,24 @@
   /* ================================================================== */
   /* Estado                                                              */
   /* ================================================================== */
-  const datosIniciales = { presupuesto: 40, moneda: "USD", dias: 3, personas: 2, comidas: ["almuerzo"], gustos: [], alergias: [], notas: "" };
-  const guardados = store.get(K.datos) || {};
+  const datosIniciales = () => ({ presupuesto: 40, moneda: "USD", diasSemana: [0, 1, 2], personas: 2, comidas: ["almuerzo"], gustos: [], alergias: [], notas: "" });
   const state = {
+    usuario: null, us: null,          // persona con sesión y su almacén
     paso: 1, maxPaso: 1,
-    datos: { ...datosIniciales, ...guardados, comidas: core.sanearComidas(guardados.comidas || guardados.comida ? guardados : datosIniciales) },
-    plan: null, diaSel: 0, comidaSel: 0,
+    datos: datosIniciales(),
+    plan: null, menuId: null, diaSel: 0, comidaSel: 0,
     tengo: new Set(), hechos: new Set(), // claves "dia.comida.indice"
     generando: false, sinServidor: false
   };
-  delete state.datos.comida;
+
+  function cargarDatosUsuario() {
+    const g = (state.us && state.us.get("datos")) || {};
+    const base = { ...datosIniciales(), ...g };
+    base.comidas = core.sanearComidas(g.comidas || g.comida ? g : datosIniciales());
+    base.diasSemana = core.sanearDiasSemana(g.diasSemana || g.dias ? g : datosIniciales());
+    delete base.comida; delete base.dias;
+    state.datos = base;
+  }
   const cfgLocal = window.ECOMENU_CONFIG || {};
   const ajustes = {
     key: store.get(K.key, ""),
@@ -60,6 +69,8 @@
   const claveActiva = () => (ajustes.key || cfgLocal.apiKey || "").trim();
   const enServidorWeb = () => /^https?:$/.test(location.protocol) && !state.sinServidor;
   const kIng = (d, c, i) => `${d}.${c}.${i}`;
+  /** Nombre del día i del plan abierto (los días pueden no ser seguidos). */
+  const diaPlan = (i, plan = state.plan) => DIAS_SEMANA[plan?.datos?.diasSemana?.[i] ?? i];
 
   /* ================================================================== */
   /* Indicador de conexión                                               */
@@ -112,8 +123,10 @@
       $("#errPresupuesto").textContent = "";
     }
     if (n === 2) {
-      if (!state.datos.comidas.length) { $("#errComidas").textContent = "Elige al menos una comida."; return false; }
-      $("#errComidas").textContent = "";
+      let ok = true;
+      if (!state.datos.diasSemana.length) { $("#errDias").textContent = "Elige al menos un día."; ok = false; } else $("#errDias").textContent = "";
+      if (!state.datos.comidas.length) { $("#errComidas").textContent = "Elige al menos una comida."; ok = false; } else $("#errComidas").textContent = "";
+      return ok;
     }
     return true;
   }
@@ -131,7 +144,7 @@
     if (b && !b.disabled && validarPaso(state.paso)) irAPaso(Number(b.dataset.ir));
   });
 
-  function guardarDatos() { store.set(K.datos, state.datos); }
+  function guardarDatos() { if (state.us) state.us.set("datos", state.datos); }
 
   /* ---------------- Paso 1: presupuesto ---------------- */
   const inpPres = $("#presupuesto"), rango = $("#presupuestoRango"), selMoneda = $("#moneda");
@@ -150,7 +163,8 @@
   function actualizarInsight() {
     const d = state.datos;
     const nComidas = Math.max(1, d.comidas.length);
-    const platos = d.dias * d.personas * nComidas;
+    const nDias = Math.max(1, d.diasSemana.length);
+    const platos = nDias * d.personas * nComidas;
     const porPlato = d.presupuesto / Math.max(1, platos);
     const usd = porPlato * (A_USD[d.moneda] || 1);
     $("#insightValor").textContent = d.presupuesto > 0 ? dinero(porPlato, d.moneda) : "—";
@@ -161,8 +175,8 @@
     else if (usd < 4.5) { txt = "Cómodo: hay espacio para variedad y algo de carne."; color = "var(--ok)"; }
     else { txt = "Holgado: puedes darte algunos gustos."; color = "var(--ok)"; }
     const cuenta = nComidas > 1
-      ? `${d.dias} día(s) × ${nComidas} comidas × ${d.personas} persona(s) = ${platos} platos.`
-      : `${d.dias} día(s) × ${d.personas} persona(s) = ${platos} platos.`;
+      ? `${nDias} día(s) × ${nComidas} comidas × ${d.personas} persona(s) = ${platos} platos.`
+      : `${nDias} día(s) × ${d.personas} persona(s) = ${platos} platos.`;
     $("#insightTexto").textContent = `${cuenta} ${txt}`;
     const m = $("#insightMeter");
     m.style.width = `${Math.min(100, (usd / 6) * 100)}%`;
@@ -175,48 +189,45 @@
   selMoneda.addEventListener("change", () => { state.datos.moneda = selMoneda.value; actualizarInsight(); guardarDatos(); });
 
   /* ---------------- Paso 2: días, personas y comidas ---------------- */
+  /** "Lunes, miércoles y viernes" o "Lunes a viernes" si son seguidos. */
+  function textoDias(indices) {
+    if (!indices.length) return "";
+    if (indices.length === 7) return "Toda la semana";
+    const seguidos = indices.length > 2 && indices.every((d, k) => k === 0 || d === indices[k - 1] + 1);
+    if (seguidos) return `${DIAS_SEMANA[indices[0]]} a ${DIAS_SEMANA[indices[indices.length - 1]].toLowerCase()}`;
+    return listaNatural(indices.map((d, k) => (k === 0 ? DIAS_SEMANA[d] : DIAS_SEMANA[d].toLowerCase())));
+  }
+
   function renderSemana() {
-    $$("#semana button").forEach((b) => {
-      const n = Number(b.dataset.dias);
-      b.setAttribute("aria-checked", String(n === state.datos.dias));
-      b.tabIndex = n === state.datos.dias ? 0 : -1;
-      b.classList.toggle("en-plan", n < state.datos.dias);
-    });
-    const d = state.datos.dias;
-    $("#semanaTexto").textContent = d === 1 ? "Plan de 1 día · Lunes" : `Plan de ${d} días · Lunes ${d === 2 ? "y" : "a"} ${DIAS_SEMANA[d - 1]}`;
+    const sel = state.datos.diasSemana;
+    $$("#semana button").forEach((btn) => btn.setAttribute("aria-pressed", String(sel.includes(Number(btn.dataset.dia)))));
+    const n = sel.length;
+    $("#semanaTexto").textContent = n ? `Plan de ${n} ${n === 1 ? "día" : "días"} · ${textoDias(sel)}` : "Elige al menos un día";
     $("#personas").textContent = state.datos.personas;
     actualizarInsight();
   }
 
   function renderComidas() {
     $$("#comidas input").forEach((i) => { i.checked = state.datos.comidas.includes(i.value); });
-    const todas = state.datos.comidas.length === COMIDAS.length;
-    $("#todasComidas").textContent = todas ? "Solo almuerzo" : "Elegir las tres";
     actualizarInsight();
   }
 
-  function fijarComidas(lista) {
-    state.datos.comidas = COMIDAS.filter((c) => lista.includes(c));
-    if (state.datos.comidas.length) $("#errComidas").textContent = "";
-    renderComidas(); guardarDatos();
-  }
-
   $("#semana").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b) return;
-    state.datos.dias = Number(b.dataset.dias); renderSemana(); guardarDatos();
-  });
-  $("#semana").addEventListener("keydown", (e) => {
-    const delta = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    if (!delta) return;
-    e.preventDefault();
-    state.datos.dias = Math.min(7, Math.max(1, state.datos.dias + delta));
+    const btn = e.target.closest("button[data-dia]"); if (!btn) return;
+    const d = Number(btn.dataset.dia);
+    const sel = new Set(state.datos.diasSemana);
+    if (sel.has(d)) sel.delete(d); else sel.add(d);
+    state.datos.diasSemana = [...sel].sort((x, y) => x - y);
+    if (state.datos.diasSemana.length) $("#errDias").textContent = "";
     renderSemana(); guardarDatos();
-    $(`#semana button[data-dias="${state.datos.dias}"]`).focus();
   });
   $("#menosPersonas").addEventListener("click", () => { state.datos.personas = Math.max(1, state.datos.personas - 1); renderSemana(); guardarDatos(); });
   $("#masPersonas").addEventListener("click", () => { state.datos.personas = Math.min(12, state.datos.personas + 1); renderSemana(); guardarDatos(); });
-  $("#comidas").addEventListener("change", () => fijarComidas($$("#comidas input:checked").map((i) => i.value)));
-  $("#todasComidas").addEventListener("click", () => fijarComidas(state.datos.comidas.length === COMIDAS.length ? ["almuerzo"] : COMIDAS));
+  $("#comidas").addEventListener("change", () => {
+    state.datos.comidas = COMIDAS.filter((c) => $$("#comidas input:checked").some((i) => i.value === c));
+    if (state.datos.comidas.length) $("#errComidas").textContent = "";
+    renderComidas(); guardarDatos();
+  });
 
   /* ---------------- Pasos 3 y 4: gustos y alergias ---------------- */
   const GRUPOS = {
@@ -273,7 +284,7 @@
     const d = state.datos;
     const filas = [
       ["Presupuesto", dinero(d.presupuesto, d.moneda), 1],
-      ["Calendario", `${d.dias} día(s) · ${d.personas} persona(s)`, 2],
+      ["Días", `${textoDias(d.diasSemana)} · ${d.personas} persona(s)`, 2],
       ["Comidas", listaNatural(d.comidas.map((c) => ETIQUETA[c].toLowerCase())).replace(/^./, (x) => x.toUpperCase()), 2],
       ["Gustos", d.gustos.join(", ") || "Sin preferencias", 3],
       ["No puedo comer", d.alergias.join(", ") || "Nada", 4]
@@ -411,12 +422,13 @@
         } catch { /* nos quedamos con el primer plan */ }
       }
 
-      plan.fuente = fuente; plan.modelo = modelo;
-      state.plan = plan; state.diaSel = 0; state.comidaSel = 0;
+      plan.fuente = fuente; plan.modelo = modelo; plan.creado = Date.now();
+      state.plan = plan; state.menuId = `m_${Date.now().toString(36)}`; state.diaSel = 0; state.comidaSel = 0;
       state.tengo = new Set(); state.hechos = new Set();
       guardarPlan();
       mostrarCarga(false);
       renderResultados(true);
+      renderMisMenus(); actualizarFacts();
       toast(fuente === "demo" ? "Plan de ejemplo listo" : "Tu menú está listo");
     } catch (err) {
       console.error(err);
@@ -436,7 +448,8 @@
     try {
       const evitar = plan.dias.flatMap((d) => d.comidas.map((c) => c.platillo));
       const extra = { diaNumero: di + 1, comidaTipo: actual.tipo, evitar };
-      const { plan: raw } = await pedirPlan({ ...datos, presupuesto: disponible, dias: 1, comidas: [actual.tipo] }, extra);
+      const diaReal = datos.diasSemana?.[di] ?? di;
+      const { plan: raw } = await pedirPlan({ ...datos, presupuesto: disponible, diasSemana: [diaReal], dias: 1, comidas: [actual.tipo] }, extra);
       const recibida = raw?.dias?.[0]?.comidas?.[0];
       if (!recibida) throw new Error("No llegó ninguna receta nueva.");
       plan.dias[di].comidas[ci] = normalizarReceta(recibida, actual.tipo, datos.personas);
@@ -446,7 +459,7 @@
       [...state.hechos].filter((k) => k.startsWith(prefijo)).forEach((k) => state.hechos.delete(k));
       guardarPlan();
       renderResultados();
-      toast(`Nuevo ${ETIQUETA[actual.tipo].toLowerCase()} para el ${DIAS_SEMANA[di].toLowerCase()}: ${plan.dias[di].comidas[ci].platillo}`);
+      toast(`Nuevo ${ETIQUETA[actual.tipo].toLowerCase()} para el ${diaPlan(di).toLowerCase()}: ${plan.dias[di].comidas[ci].platillo}`);
     } catch (err) {
       toast(err.message || "No se pudo cambiar la receta.");
       boton.disabled = false; boton.textContent = `Cambiar ${ETIQUETA[actual.tipo].toLowerCase()}`;
@@ -455,8 +468,44 @@
     }
   }
 
+  /* ---------------- Mis menús (por usuario) ---------------- */
+  const leerMenus = () => (state.us ? state.us.get("menus", []) : []);
+  const escribirMenus = (lista) => { if (state.us) state.us.set("menus", lista); };
+
+  /** Guarda el menú abierto (lo que ya tienes en casa, pasos hechos y selección). Crea la entrada si es nuevo. */
   function guardarPlan() {
-    store.set(K.plan, { plan: state.plan, tengo: [...state.tengo], hechos: [...state.hechos], diaSel: state.diaSel, comidaSel: state.comidaSel });
+    if (!state.us || !state.plan || !state.menuId) return;
+    const menus = leerMenus();
+    const entrada = { id: state.menuId, actualizado: Date.now(), plan: state.plan, tengo: [...state.tengo], hechos: [...state.hechos], diaSel: state.diaSel, comidaSel: state.comidaSel };
+    const k = menus.findIndex((m) => m.id === state.menuId);
+    if (k >= 0) menus[k] = { ...menus[k], ...entrada };
+    else menus.unshift({ ...entrada, creado: Date.now() });
+    escribirMenus(menus.slice(0, 30));
+    state.us.set("actual", state.menuId);
+  }
+
+  function abrirMenu(id, scroll = false) {
+    const m = leerMenus().find((x) => x.id === id);
+    if (!m?.plan?.dias?.[0]?.comidas) return false;
+    state.plan = m.plan; state.menuId = m.id;
+    state.tengo = new Set(m.tengo || []); state.hechos = new Set(m.hechos || []);
+    state.diaSel = Math.min(m.diaSel || 0, m.plan.dias.length - 1);
+    state.comidaSel = m.comidaSel || 0;
+    state.us.set("actual", id);
+    renderResultados(scroll);
+    renderMisMenus();
+    return true;
+  }
+
+  function eliminarMenu(id) {
+    escribirMenus(leerMenus().filter((m) => m.id !== id));
+    if (state.menuId === id) {
+      state.plan = null; state.menuId = null;
+      state.us.del("actual");
+      $("#resultados").hidden = true;
+    }
+    renderMisMenus(); actualizarFacts();
+    toast("Menú eliminado");
   }
 
   /* ================================================================== */
@@ -477,7 +526,8 @@
     $("#resultados").hidden = false;
     $("#resEyebrow").textContent = plan.fuente === "demo" ? "Plan de ejemplo" : `Generado con ${plan.modelo || "Gemini"}`;
     const comidasTxt = listaNatural(datos.comidas.map((c) => ETIQUETA[c].toLowerCase()));
-    $("#resTitulo").textContent = `${plan.dias.length} ${plan.dias.length === 1 ? "día" : "días"} de ${comidasTxt} para ${datos.personas}`;
+    $("#resTitulo").textContent = `${textoDias(datos.diasSemana || plan.dias.map((_, i) => i))}: ${comidasTxt} para ${datos.personas}`;
+    $("#resGuardado").hidden = !state.menuId;
     renderPresupuesto();
     renderTira();
     renderDia();
@@ -490,7 +540,7 @@
     const out = [];
     plan.dias.forEach((d, di) => d.comidas.forEach((c) => c.ingredientes.forEach((ing) => {
       const n = ing.nombre.toLowerCase();
-      terms.forEach((t) => { if (n.includes(t) && !/\bsin\s/.test(n)) out.push(`${DIAS_SEMANA[di].toLowerCase()} (${c.tipo}): ${ing.nombre}`); });
+      terms.forEach((t) => { if (n.includes(t) && !/\bsin\s/.test(n)) out.push(`${diaPlan(di).toLowerCase()} (${c.tipo}): ${ing.nombre}`); });
     })));
     return out;
   }
@@ -532,13 +582,13 @@
           ${plan.dias.map((d, i) => {
             const h = Math.max(6, (d.costo_dia / maxDia) * 78);
             const detalle = d.comidas.map((c) => `${ETIQUETA[c.tipo]} ${dinero(c.costo, mon)}`).join(", ");
-            return `<button type="button" class="bar ${i === state.diaSel ? "activo" : ""}" data-dia="${i}" style="--h:${h}px" aria-label="${DIAS_SEMANA[i]}: ${esc(dinero(d.costo_dia, mon))} (${esc(detalle)})">
+            return `<button type="button" class="bar ${i === state.diaSel ? "activo" : ""}" data-dia="${i}" style="--h:${h}px" aria-label="${diaPlan(i)}: ${esc(dinero(d.costo_dia, mon))} (${esc(detalle)})">
               <span class="bar-val">${esc(dinero(d.costo_dia, mon))}</span>
               <span class="stack" style="height:0">${d.comidas.map((c) => `<i class="sw-${c.tipo}" style="flex-grow:${Math.max(c.costo, 0.01)}"></i>`).join("")}</span>
             </button>`;
           }).join("")}
         </div>
-        <div class="bars-labels" aria-hidden="true">${plan.dias.map((_, i) => `<span>${DIAS_SEMANA[i].slice(0, 3)}</span>`).join("")}</div>
+        <div class="bars-labels" aria-hidden="true">${plan.dias.map((_, i) => `<span>${diaPlan(i).slice(0, 3)}</span>`).join("")}</div>
       </div>
       ${plan.comentario ? `<p class="budget-note">${esc(plan.comentario)}</p>` : ""}
       ${avisos.map(([t, m]) => `<p class="alert alert-${t}">${esc(m)}</p>`).join("")}`;
@@ -559,7 +609,7 @@
       <button type="button" class="day-tab" role="tab" id="tab-${i}" data-dia="${i}" aria-selected="${i === state.diaSel}" aria-controls="detalleDia" tabindex="${i === state.diaSel ? 0 : -1}">
         <span class="day-tab-img" style="background-image:url('${fotoParaPlato(recetaPrincipal(d), i, 420)}')"></span>
         <span class="day-tab-body">
-          <span class="day-tab-day">${DIAS_SEMANA[i]}</span>
+          <span class="day-tab-day">${diaPlan(i)}</span>
           <span class="day-tab-meals">${d.comidas.map((c) => `<span><b class="dot sw-${c.tipo}" aria-hidden="true"></b>${esc(c.platillo)}</span>`).join("")}</span>
           <span class="day-tab-cost">${esc(dinero(d.costo_dia, mon))}</span>
         </span>
@@ -600,16 +650,16 @@
       <div class="day-bar">
         <div class="day-bar-title">
           <p class="eyebrow eyebrow-dark">Día ${d.dia} · ${d.comidas.length} ${d.comidas.length === 1 ? "comida" : "comidas"}</p>
-          <h3>${DIAS_SEMANA[di]} <span>${esc(dinero(d.costo_dia, mon))}</span></h3>
+          <h3>${diaPlan(di)} <span>${esc(dinero(d.costo_dia, mon))}</span></h3>
         </div>
-        ${d.comidas.length > 1 ? `<div class="meal-switch" role="tablist" aria-label="Comidas del ${DIAS_SEMANA[di]}">
+        ${d.comidas.length > 1 ? `<div class="meal-switch" role="tablist" aria-label="Comidas del ${diaPlan(di)}">
           ${d.comidas.map((c, k) => `<button type="button" role="tab" data-comida="${k}" aria-selected="${k === ci}" tabindex="${k === ci ? 0 : -1}">
             <b class="dot sw-${c.tipo}" aria-hidden="true"></b><span>${ETIQUETA[c.tipo]}</span><small>${esc(dinero(c.costo, mon))}</small></button>`).join("")}
         </div>` : ""}
       </div>
       <div class="meal" id="recetaActual">
         <header class="day-hero" style="background-image:url('${fotoParaPlato(r, di + ci, 1400)}')">
-          <p class="eyebrow">${ETIQUETA[r.tipo]} · ${DIAS_SEMANA[di]}</p>
+          <p class="eyebrow">${ETIQUETA[r.tipo]} · ${diaPlan(di)}</p>
           <h3>${esc(r.platillo)}</h3>
           ${r.descripcion ? `<p>${esc(r.descripcion)}</p>` : ""}
           <div class="chips">
@@ -713,7 +763,8 @@
       plan: state.plan,
       grupos: EcoCompras.construir(state.plan, state.tengo),
       dinero: (v) => dinero(round2(v), mon),
-      diasSemana: DIAS_SEMANA,
+      diasSemana: state.plan.dias.map((_, i) => diaPlan(i)),
+      rango: textoDias(state.plan.datos.diasSemana || state.plan.dias.map((_, i) => i)),
       etiquetasComida: ETIQUETA,
       totalComprar: totalAComprar()
     });
@@ -728,11 +779,12 @@
     }
   }
   $("#btnCopiar").addEventListener("click", copiarLista);
-  $("#btnNuevo").addEventListener("click", () => {
+  function nuevoMenu() {
     irAPaso(1, { foco: false });
     $("#asistente").scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => $("#presupuesto").focus({ preventScroll: true }), 400);
-  });
+  }
+  $("#btnNuevo").addEventListener("click", nuevoMenu);
 
   /* ================================================================== */
   /* Modo cocina                                                         */
@@ -773,7 +825,7 @@
   function pintarPaso() {
     const r = recetaCocina(), total = r.pasos.length, p = r.pasos[cocina.paso];
     pararTimer();
-    $("#cocinaDia").textContent = `${ETIQUETA[r.tipo]} · ${DIAS_SEMANA[cocina.dia]}`;
+    $("#cocinaDia").textContent = `${ETIQUETA[r.tipo]} · ${diaPlan(cocina.dia)}`;
     $("#cocinaPlato").textContent = r.platillo;
     $("#cocinaContador").textContent = `Paso ${cocina.paso + 1} de ${total}`;
     $("#cocinaBarra").style.width = `${((cocina.paso + 1) / total) * 100}%`;
@@ -836,6 +888,7 @@
   /* ================================================================== */
   const dlgAjustes = $("#ajustes");
   $("#btnAjustes").addEventListener("click", () => {
+    if (dlgMenu.open) dlgMenu.close();
     $("#apiKey").value = ajustes.key;
     $("#apiKey").type = "password"; $("#btnVerKey").textContent = "Mostrar";
     $("#modelo").value = [...$("#modelo").options].some((o) => o.value === ajustes.modelo) ? ajustes.modelo : "auto";
@@ -885,32 +938,220 @@
   document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.style.visibility = "hidden"; }, true);
 
   /* ================================================================== */
+  /* Cuenta: crear, iniciar sesión, cerrar sesión                         */
+  /* ================================================================== */
+  const dlgAuth = $("#auth");
+  let modoAuth = "crear";
+
+  function fijarModoAuth(modo) {
+    modoAuth = modo;
+    const crear = modo === "crear";
+    $("#authTitulo").textContent = crear ? "Crear cuenta" : "Iniciar sesión";
+    $("#tabCrear").setAttribute("aria-selected", String(crear));
+    $("#tabEntrar").setAttribute("aria-selected", String(!crear));
+    $("#campoNombre").hidden = !crear;
+    $("#authEnviar").textContent = crear ? "Crear cuenta" : "Entrar";
+    $("#authClave").setAttribute("autocomplete", crear ? "new-password" : "current-password");
+    $("#authClave").placeholder = crear ? "Mínimo 6 caracteres" : "Tu contraseña";
+    $("#authNota").textContent = crear
+      ? "La cuenta y la sesión se guardan en este dispositivo."
+      : "Usa el correo y la contraseña con los que creaste tu cuenta en este dispositivo.";
+    $("#authError").hidden = true;
+    $$("#formAuth [aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+  }
+
+  function abrirAuth(modo) {
+    fijarModoAuth(modo);
+    $("#authClave").value = "";
+    dlgAuth.showModal();
+    (modo === "crear" ? $("#authNombre") : $("#authCorreo")).focus();
+  }
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-auth]");
+    if (b) abrirAuth(b.dataset.auth);
+  });
+  $$(".auth-tabs [data-modo]").forEach((t) => t.addEventListener("click", () => fijarModoAuth(t.dataset.modo)));
+  $("#cerrarAuth").addEventListener("click", () => dlgAuth.close());
+  $("#verClave").addEventListener("click", () => {
+    const ver = $("#authClave").type === "password";
+    $("#authClave").type = ver ? "text" : "password";
+    $("#verClave").textContent = ver ? "Ocultar" : "Mostrar";
+  });
+
+  $("#formAuth").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("#authError"), btn = $("#authEnviar");
+    err.hidden = true;
+    $$("#formAuth [aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+    btn.disabled = true;
+    try {
+      const datos = { nombre: $("#authNombre").value, correo: $("#authCorreo").value, clave: $("#authClave").value };
+      const u = modoAuth === "crear" ? await EcoCuentas.crear(datos) : await EcoCuentas.entrar(datos);
+      dlgAuth.close();
+      $("#authClave").value = "";
+      entrarComo(u);
+      toast(modoAuth === "crear" ? `Bienvenido, ${u.nombre}. Tu cuenta está lista.` : `Hola de nuevo, ${u.nombre}`);
+      $("#planificador").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (ex) {
+      err.textContent = ex.message || "No se pudo completar. Vuelve a intentarlo.";
+      err.hidden = false;
+      const campo = { nombre: "#authNombre", correo: "#authCorreo", clave: "#authClave" }[ex.campo];
+      if (campo) { $(campo).setAttribute("aria-invalid", "true"); $(campo).focus(); }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  const inicial = (nombre) => (nombre || "?").trim().charAt(0).toUpperCase() || "?";
+
+  /** Muestra la portada (sin sesión) o el planificador (con sesión). */
+  function mostrarVista() {
+    const conSesion = !!state.usuario;
+    $("#inicio").hidden = conSesion;
+    $("#comoFunciona").hidden = conSesion;
+    $("#planificador").hidden = !conSesion;
+    $("#accionesInvitado").hidden = conSesion;
+    $("#accionesUsuario").hidden = !conSesion;
+    if (!conSesion) $("#resultados").hidden = true;
+  }
+
+  function entrarComo(u) {
+    state.usuario = u;
+    state.us = EcoCuentas.almacen(u.id);
+    state.plan = null; state.menuId = null;
+    cargarDatosUsuario();
+    const primer = u.nombre.split(" ")[0];
+    $("#saludo").textContent = `Hola, ${primer}`;
+    $("#avatarTop").textContent = inicial(u.nombre);
+    $("#avatarMenu").textContent = inicial(u.nombre);
+    $("#menuNombre").textContent = u.nombre;
+    $("#menuCorreo").textContent = u.correo;
+    selMoneda.value = state.datos.moneda;
+    $("#notas").value = state.datos.notas || "";
+    sincronizarPresupuesto(state.datos.presupuesto);
+    renderSemana(); renderComidas();
+    renderGrupo("gustos"); renderGrupo("alergias");
+    state.maxPaso = 1; irAPaso(1, { foco: false });
+    mostrarVista();
+    actualizarConexion();
+    const actual = state.us.get("actual");
+    if (!(actual && abrirMenu(actual))) $("#resultados").hidden = true;
+    renderMisMenus(); actualizarFacts();
+  }
+
+  function cerrarSesion() {
+    EcoCuentas.salir();
+    if (dlgMenu.open) dlgMenu.close();
+    const nombre = state.usuario?.nombre?.split(" ")[0];
+    state.usuario = null; state.us = null; state.plan = null; state.menuId = null;
+    state.datos = datosIniciales();
+    mostrarVista();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast(nombre ? `Hasta pronto, ${nombre}. Cerraste sesión.` : "Cerraste sesión.");
+  }
+  $("#btnSalir").addEventListener("click", cerrarSesion);
+
+  /* ================================================================== */
+  /* Menú lateral y Mis menús                                            */
+  /* ================================================================== */
+  const dlgMenu = $("#menuLateral");
+  $("#btnMenu").addEventListener("click", () => { renderMisMenus(); dlgMenu.showModal(); });
+  $("#cerrarMenu").addEventListener("click", () => dlgMenu.close());
+  dlgMenu.addEventListener("click", (e) => { if (e.target === dlgMenu) dlgMenu.close(); });
+  $("#navNuevo").addEventListener("click", () => { dlgMenu.close(); nuevoMenu(); });
+  $("#navActual").addEventListener("click", () => {
+    dlgMenu.close();
+    $("#resultados").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  $("#logo").addEventListener("click", (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+
+  function actualizarFacts() {
+    const el = $("#factMenus");
+    if (el) el.textContent = leerMenus().length;
+  }
+
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+  /** Agrupa: "Esta semana", "Semana pasada" y luego por mes. */
+  function grupoFecha(ts) {
+    const d = new Date(ts), hoy = new Date();
+    const lunes = new Date(hoy); lunes.setHours(0, 0, 0, 0); lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+    if (d >= lunes) return "Esta semana";
+    const lunesPasado = new Date(lunes); lunesPasado.setDate(lunes.getDate() - 7);
+    if (d >= lunesPasado) return "Semana pasada";
+    return `${MESES[d.getMonth()].replace(/^./, (x) => x.toUpperCase())} ${d.getFullYear()}`;
+  }
+
+  let pendienteBorrar = null, borrarTimer = null;
+
+  function renderMisMenus() {
+    const cont = $("#misMenus"); if (!cont) return;
+    const menus = leerMenus();
+    $("#misMenusCount").textContent = menus.length;
+    $("#navActual").hidden = !state.plan;
+    if (!menus.length) {
+      cont.innerHTML = `<p class="drawer-empty">Aún no tienes menús guardados. Cada menú que generes aparecerá aquí.</p>`;
+      return;
+    }
+    const grupos = new Map();
+    menus.forEach((m) => {
+      const g = grupoFecha(m.creado || m.actualizado || Date.now());
+      if (!grupos.has(g)) grupos.set(g, []);
+      grupos.get(g).push(m);
+    });
+    cont.innerHTML = [...grupos].map(([titulo, lista]) => `
+      <p class="drawer-sub">${esc(titulo)}</p>
+      <ul class="menu-list">
+        ${lista.map((m) => {
+          const d = m.plan.datos, mon = d.moneda;
+          const total = round2(m.plan.dias.reduce((s2, x) => s2 + x.costo_dia, 0));
+          const dias = textoDias(d.diasSemana || m.plan.dias.map((_, i) => i));
+          const comidas = listaNatural(d.comidas.map((c) => ETIQUETA[c].toLowerCase()));
+          const platos = m.plan.dias.flatMap((x) => x.comidas.map((c) => c.platillo));
+          const fecha = new Date(m.creado || Date.now()).toLocaleDateString("es", { day: "numeric", month: "short" });
+          const activo = m.id === state.menuId;
+          const confirmar = pendienteBorrar === m.id;
+          return `<li class="menu-item ${activo ? "activo" : ""}">
+            <button type="button" class="menu-open" data-abrir="${m.id}" ${activo ? 'aria-current="true"' : ""}>
+              <span class="menu-title">${esc(dias)}</span>
+              <span class="menu-meta">${esc(comidas)} · ${d.personas} pers. · ${esc(fecha)}</span>
+              <span class="menu-dishes">${esc(platos.slice(0, 3).join(" · "))}${platos.length > 3 ? ` +${platos.length - 3}` : ""}</span>
+              <span class="menu-money"><b>${esc(dinero(total, mon))}</b> de ${esc(dinero(d.presupuesto, mon))}</span>
+            </button>
+            <button type="button" class="menu-del ${confirmar ? "confirmar" : ""}" data-borrar="${m.id}" aria-label="${confirmar ? "Confirmar: eliminar" : "Eliminar"} el menú ${esc(dias)}">${confirmar ? "¿Eliminar?" : "×"}</button>
+          </li>`;
+        }).join("")}
+      </ul>`).join("");
+  }
+
+  $("#misMenus").addEventListener("click", (e) => {
+    const abrir = e.target.closest("[data-abrir]");
+    if (abrir) {
+      dlgMenu.close();
+      abrirMenu(abrir.dataset.abrir, true);
+      return;
+    }
+    const borrar = e.target.closest("[data-borrar]");
+    if (!borrar) return;
+    const id = borrar.dataset.borrar;
+    clearTimeout(borrarTimer);
+    if (pendienteBorrar === id) { pendienteBorrar = null; eliminarMenu(id); return; }
+    pendienteBorrar = id; renderMisMenus();
+    $(`[data-borrar="${id}"]`)?.focus();
+    borrarTimer = setTimeout(() => { pendienteBorrar = null; renderMisMenus(); }, 3500);
+  });
+
+  /* ================================================================== */
   /* Inicio                                                              */
   /* ================================================================== */
   function iniciar() {
     const fp = $("#factPrecios");
-    if (fp) fp.textContent = Object.values(PRECIOS_REFERENCIA).reduce((s, g) => s + Object.keys(g).length, 0);
-
-    selMoneda.value = state.datos.moneda;
-    $("#notas").value = state.datos.notas || "";
-    sincronizarPresupuesto(state.datos.presupuesto);
-    renderSemana();
-    renderComidas();
-    renderGrupo("gustos"); renderGrupo("alergias");
-    irAPaso(1, { foco: false });
-    actualizarConexion();
-
-    store.del("eco.plan"); // formato anterior (una receta por día)
-    const guardado = store.get(K.plan);
-    if (guardado?.plan?.dias?.[0]?.comidas) {
-      state.plan = guardado.plan;
-      state.tengo = new Set(guardado.tengo || []);
-      state.hechos = new Set(guardado.hechos || []);
-      state.diaSel = Math.min(guardado.diaSel || 0, state.plan.dias.length - 1);
-      state.comidaSel = guardado.comidaSel || 0;
-      renderResultados();
-    }
-    guardarDatos();
+    if (fp) fp.textContent = Object.values(PRECIOS_REFERENCIA).reduce((s2, g) => s2 + Object.keys(g).length, 0);
+    ["eco.plan", "eco.plan2", "eco.datos"].forEach((k) => store.del(k)); // formatos anteriores, sin cuentas
+    const u = EcoCuentas.actual();
+    if (u) entrarComo(u);
+    else mostrarVista();
   }
   iniciar();
 })();

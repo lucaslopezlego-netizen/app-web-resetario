@@ -1,5 +1,5 @@
 /**
- * EcoMenú IA — Lista de compras.
+ * Eco Menú — Lista de compras.
  * Agrupa los ingredientes de todo el plan por pasillo del mercado,
  * suma las cantidades cuando la unidad coincide y arma el texto para copiar.
  */
@@ -128,18 +128,19 @@ const EcoCompras = (() => {
 
   /**
    * Texto ordenado para pegar en WhatsApp, Notas o un correo.
-   * @param ctx { plan, grupos, dinero(v), diasSemana[], etiquetasComida{} , totalComprar, presupuesto }
+   * @param ctx { plan, grupos, dinero(v), diasSemana[] (nombre de cada día del plan), rango (texto de los días),
+   *              etiquetasComida{}, totalComprar }
    */
-  function aTexto({ plan, grupos, dinero, diasSemana, etiquetasComida, totalComprar }) {
+  function aTexto({ plan, grupos, dinero, diasSemana, rango, etiquetasComida, totalComprar }) {
     const d = plan.datos;
     const linea = "──────────────────────";
     const n = plan.dias.length;
-    const rango = n === 1 ? diasSemana[0] : `${diasSemana[0]} ${n === 2 ? "y" : "a"} ${diasSemana[n - 1]}`;
+    rango = rango || (n === 1 ? diasSemana[0] : `${diasSemana[0]} a ${diasSemana[n - 1]}`);
     const comidas = d.comidas.map((c) => etiquetasComida[c].toLowerCase());
     const comidasTxt = comidas.length > 1 ? `${comidas.slice(0, -1).join(", ")} y ${comidas[comidas.length - 1]}` : comidas[0];
     const resto = d.presupuesto - totalComprar;
     const out = [
-      "🛒 LISTA DE COMPRAS · EcoMenú IA",
+      "🛒 LISTA DE COMPRAS · Eco Menú",
       `${rango} · ${d.personas} ${d.personas === 1 ? "persona" : "personas"} · ${comidasTxt}`,
       linea
     ];

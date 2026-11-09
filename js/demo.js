@@ -1,5 +1,5 @@
 /**
- * EcoMenú IA — Modo demo.
+ * Eco Menú — Modo demo.
  * Genera un plan sin llamar a la IA, usando recetas de ejemplo y
  * PRECIOS_REFERENCIA. Útil para probar la interfaz sin API Key.
  * Devuelve exactamente el mismo formato que se pide a Gemini.

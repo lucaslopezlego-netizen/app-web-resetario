@@ -1,5 +1,5 @@
 /**
- * EcoMenú IA — Núcleo compartido entre el navegador y la función de Vercel (api/generar.js).
+ * Eco Menú — Núcleo compartido entre el navegador y la función de Vercel (api/generar.js).
  * Contiene: esquema de respuesta, prompts, saneamiento de datos y llamada a Gemini
  * con cambio automático de modelo si uno está saturado o no disponible.
  */
@@ -17,6 +17,7 @@
   const MODELOS = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
 
   const COMIDAS = ["desayuno", "almuerzo", "cena"];
+  const NOMBRES_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 
   const RECETA_SCHEMA = {
     type: "OBJECT",
@@ -92,11 +93,25 @@
     return validas.length ? validas : ["almuerzo"];
   }
 
+  /** Días de la semana elegidos (0 = lunes … 6 = domingo), sin repetir y en orden. Acepta el formato antiguo { dias: 3 }. */
+  function sanearDiasSemana(d = {}) {
+    const elegidos = Array.isArray(d.diasSemana)
+      ? [...new Set(d.diasSemana.map((x) => Math.round(Number(x))).filter((x) => x >= 0 && x <= 6))].sort((a, b) => a - b)
+      : [];
+    if (elegidos.length) return elegidos;
+    const n = Math.round(num(d.dias, 1, 7, 3));
+    return Array.from({ length: n }, (_, i) => i);
+  }
+
+  const listaNatural = (arr) => arr.length > 1 ? `${arr.slice(0, -1).join(", ")} y ${arr[arr.length - 1]}` : (arr[0] || "");
+
   function sanearDatos(d = {}) {
+    const diasSemana = sanearDiasSemana(d);
     return {
       presupuesto: Math.round(num(d.presupuesto, 0.01, 1e9, 0) * 100) / 100,
       moneda: /^[A-Z]{3}$/.test(d.moneda) ? d.moneda : "USD",
-      dias: Math.round(num(d.dias, 1, 7, 3)),
+      diasSemana,
+      dias: diasSemana.length,
       personas: Math.round(num(d.personas, 1, 12, 2)),
       comidas: sanearComidas(d),
       gustos: lista(d.gustos),
@@ -117,7 +132,7 @@
   /* ---------------- Prompts ---------------- */
   function construirSystemPrompt() {
     return [
-      "Eres EcoMenú IA, un chef nutricionista experto en cocina económica latinoamericana y en optimizar presupuestos de compra.",
+      "Eres Eco Menú, un chef nutricionista experto en cocina económica latinoamericana y en optimizar presupuestos de compra.",
       "Tu tarea es crear un menú diario con una receta por cada comida pedida (desayuno, almuerzo y/o cena), ajustándote ESTRICTAMENTE al presupuesto y respetando SIEMPRE las alergias y restricciones.",
       "",
       "BASE DE PRECIOS DE REFERENCIA (en USD, por la unidad indicada en cada clave):",
@@ -142,7 +157,9 @@
     const comidas = unaReceta && extra.comidaTipo ? [extra.comidaTipo] : d.comidas;
     const lineas = [
       `Presupuesto ${unaReceta ? "disponible para esta receta" : "total"}: ${d.presupuesto} ${d.moneda}`,
-      `Número de días: ${unaReceta ? 1 : d.dias}`,
+      unaReceta
+        ? `Día: ${NOMBRES_DIAS[d.diasSemana[0]]}`
+        : `Días a planificar (${d.dias}): ${listaNatural(d.diasSemana.map((i) => NOMBRES_DIAS[i]))}`,
       `Comidas de cada día, en este orden: ${comidas.join(", ")}`,
       `Porciones por receta (personas): ${d.personas}`,
       `Gustos / preferencias: ${d.gustos.length ? d.gustos.join(", ") : "sin preferencias específicas"}`,
@@ -154,7 +171,8 @@
       lineas.push(`Genera exactamente 1 día con 'dia' = ${extra.diaNumero} y una sola comida de tipo "${comidas[0]}". Debe ser un platillo DISTINTO a estos: ${extra.evitar.join("; ") || "ninguno"}.`);
     } else {
       const total = d.dias * comidas.length;
-      lineas.push(`Genera exactamente ${d.dias} día(s), numerados del 1 al ${d.dias}. Cada día lleva en 'comidas' exactamente ${comidas.length} receta(s), una por tipo (${comidas.join(", ")}), en ese orden. Son ${total} recetas en total y el presupuesto debe alcanzar para todas.`);
+      const orden = d.diasSemana.map((i, k) => `${k + 1} = ${NOMBRES_DIAS[i]}`).join(", ");
+      lineas.push(`Genera exactamente ${d.dias} día(s), numerados del 1 al ${d.dias} (${orden}). Si los días no son seguidos, puedes aprovechar sobras solo entre días cercanos. Cada día lleva en 'comidas' exactamente ${comidas.length} receta(s), una por tipo (${comidas.join(", ")}), en ese orden. Son ${total} recetas en total y el presupuesto debe alcanzar para todas.`);
     }
     lineas.push(`En 'resumen.presupuesto_total' devuelve ${d.presupuesto} y en 'resumen.moneda' "${d.moneda}". En 'resumen.comentario' explica en 1 o 2 frases cómo se optimizó el presupuesto.`);
     if (extra.feedback) lineas.push("", "CORRECCIÓN IMPORTANTE:", extra.feedback);
@@ -252,8 +270,8 @@
   }
 
   const api = {
-    MODELOS, COMIDAS, RESPONSE_SCHEMA, EcoError,
-    sanearDatos, sanearComidas, sanearExtra, construirSystemPrompt, construirUserPrompt,
+    MODELOS, COMIDAS, NOMBRES_DIAS, RESPONSE_SCHEMA, EcoError,
+    sanearDatos, sanearComidas, sanearDiasSemana, sanearExtra, construirSystemPrompt, construirUserPrompt,
     parsearJSON, generarConGemini
   };
 
