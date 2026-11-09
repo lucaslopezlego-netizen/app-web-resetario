@@ -1,0 +1,5 @@
+# Clave local de Gemini: nunca se sube al repositorio
+js/config.local.js
+.vercel
+node_modules
+.DS_Store

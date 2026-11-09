@@ -185,7 +185,10 @@ const MAPA_ALERGENOS = {
   carne: ["vegetarian", "vegan"]
 };
 
-function generarPlanDemo({ presupuesto, dias, personas, gustos, alergias, moneda }) {
+function generarPlanDemo({ presupuesto, dias, personas, gustos, alergias, moneda }, extra = {}) {
+  const evitar = (extra.evitar || []).map((x) => x.toLowerCase());
+  const diaNumero = extra.diaNumero || 0;
+  if (diaNumero) dias = 1;
   const restricciones = alergias.map((a) => a.toLowerCase());
   const esVeg = restricciones.some((r) => r.includes("vegetarian") || r.includes("vegan")) ||
     gustos.some((g) => g.toLowerCase().includes("vegetarian"));
@@ -206,6 +209,12 @@ function generarPlanDemo({ presupuesto, dias, personas, gustos, alergias, moneda
   const gustosLc = gustos.map((g) => g.toLowerCase());
   const puntuar = (r) => r.tags.filter((t) => gustosLc.some((g) => g.includes(t))).length;
   candidatas = [...candidatas].sort((a, b) => puntuar(b) - puntuar(a));
+  if (diaNumero) {
+    const libres = candidatas.filter((r) => !evitar.includes(r.platillo.toLowerCase()));
+    if (libres.length) candidatas = libres;
+    const k = Math.floor(Math.random() * candidatas.length);
+    candidatas = [candidatas[k]];
+  }
 
   const escala = personas / 2;
   const plan = [];
@@ -218,7 +227,7 @@ function generarPlanDemo({ presupuesto, dias, personas, gustos, alergias, moneda
     }));
     const costo = +ingredientes.reduce((s, x) => s + x.precio_estimado, 0).toFixed(2);
     plan.push({
-      dia: i + 1,
+      dia: diaNumero || i + 1,
       platillo: r.platillo,
       descripcion: r.descripcion,
       tiempo_preparacion_min: r.tiempo,

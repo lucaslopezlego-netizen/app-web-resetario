@@ -1,42 +1,54 @@
-# 🥗 EcoMenú IA
+# EcoMenú IA
 
-Aplicación web de **cocina inteligente por presupuesto**. Ingresas tu presupuesto, los días a planificar, tus gustos y tus alergias, y la IA de **Gemini (Google AI Studio)** genera una receta por día que se ajusta a ese presupuesto.
+Planificador de comidas por presupuesto. Un asistente de 5 pasos pregunta cuánto quieres gastar, cuántos días y personas, qué te gusta y qué no puedes comer. Luego **Gemini (Google AI Studio)** arma una receta por día con ingredientes, precios y pasos, sin pasarse del presupuesto.
 
-HTML5, CSS3 y JavaScript ES6+ puros, sin dependencias ni paso de compilación.
+HTML, CSS y JavaScript sin dependencias ni paso de compilación.
 
-## 🚀 Cómo ejecutarla
+## Qué puedes hacer
 
-1. Abre `index.html` en el navegador (doble clic), o sírvela en local:
+- **Asistente paso a paso:** presupuesto con deslizador y montos rápidos, un indicador de cuánto toca por plato, semana interactiva, personas, comida del día, gustos con fotos de platos reales y alérgenos.
+- **Resultados:** anillo de presupuesto usado, barras de costo por día y una tarjeta con foto por cada día.
+- **"Ya lo tengo en casa":** marca ingredientes y el costo se descuenta en vivo.
+- **Cambiar este plato:** pide a la IA otro platillo para ese día con el dinero que queda.
+- **Modo cocina:** pasos a pantalla completa, temporizador con sonido cuando un paso indica minutos, y la pantalla no se apaga.
+- **Ticket de compras:** lista consolidada con casillas y botón para copiarla.
+- El plan y el formulario se guardan en el navegador al recargar.
+
+## Ejecutar en tu computadora
+
+1. Copia `js/config.example.js` como `js/config.local.js` y pega tu clave de https://aistudio.google.com/app/apikey (este archivo está en `.gitignore` y no se sube a GitHub).
+2. Sirve la carpeta:
    ```bash
    python3 -m http.server 8080
    ```
-   y entra a http://localhost:8080
-2. Pulsa **⚙️ API**, pega tu API Key de Gemini (gratis en https://aistudio.google.com/app/apikey) y guarda.
-3. Completa el formulario y pulsa **✨ Generar Menú con IA**.
+3. Abre http://localhost:8080
 
-> Sin API Key, la app funciona en **modo demo** con recetas locales de ejemplo.
+También puedes pegar la clave en **Ajustes** (botón arriba a la derecha) en vez de usar el archivo. Sin clave, la app muestra recetas de ejemplo.
 
-## ✨ Funciones
+## Publicar en Vercel (clave protegida)
 
-- **Formulario:** presupuesto + moneda, días (1–7), personas, comida del día, gustos y alergias como *chips* o texto libre (Enter o coma para agregar).
-- **Resultados:** resumen de presupuesto usado frente al ingresado (con barra de progreso), tarjetas desplegables por día con platillo, tiempo, ingredientes con precio estimado y pasos, y una **lista de compras consolidada**.
-- **Control del presupuesto:** el costo se recalcula en el cliente sumando los ingredientes (sin confiar en la suma de la IA). Si el plan se pasa del presupuesto, se le pide **automáticamente** a la IA que lo ajuste una vez.
-- **Seguridad alimentaria:** reglas estrictas de alérgenos en el prompt y una revisión adicional de los nombres de los ingredientes que muestra un aviso si detecta coincidencias.
-- **Salida JSON estructurada** (`responseSchema` de Gemini), así la respuesta siempre tiene el mismo formato.
-- Diseño mobile-first, alto contraste, modo oscuro automático, accesible por teclado y con estilos para imprimir.
+1. Importa el repositorio en Vercel (no necesita build).
+2. En **Settings → Environment Variables** agrega `GEMINI_API_KEY` con tu clave. Opcional: `GEMINI_MODEL` para forzar un modelo.
+3. Vuelve a desplegar.
 
-## 📁 Estructura
+La página llama a `/api/generar` (`api/generar.js`), que usa la clave desde el servidor. Así los visitantes nunca la ven.
+
+## Modelos
+
+Por defecto prueba en orden `gemini-3.5-flash`, `gemini-3.1-flash-lite` y `gemini-flash-lite-latest`. Si uno está saturado o no existe, pasa al siguiente. Puedes fijar uno en Ajustes.
+
+## Estructura
 
 ```
-index.html        Interfaz
-css/styles.css    Estilos
-js/precios.js     PRECIOS_REFERENCIA (base local de precios en USD)
-js/demo.js        Generador del modo demo
-js/app.js         Lógica, prompt y llamada a Gemini
+index.html              Interfaz
+css/styles.css          Estilos
+js/precios.js           PRECIOS_REFERENCIA (precios base en USD)
+js/ecomenu-core.js      Prompts, esquema JSON y llamada a Gemini (navegador y servidor)
+js/fotos.js             Fotos de Unsplash según el tipo de plato
+js/demo.js              Recetas de ejemplo sin IA
+js/app.js               Lógica de la interfaz
+js/config.example.js    Plantilla de configuración local
+api/generar.js          Función de Vercel que guarda la clave
 ```
 
-Para ajustar los precios a tu zona, edita `js/precios.js`: la IA recibe ese objeto completo en el prompt del sistema.
-
-## ⚠️ Sobre la API Key
-
-La llamada se hace directamente desde el navegador, con la cabecera `x-goog-api-key`. La clave solo se guarda en `localStorage` si marcas "Recordar". Esto sirve para uso personal; si publicas la app, pon un pequeño backend o proxy que guarde la clave en el servidor.
+Fotos: [Unsplash](https://unsplash.com).

@@ -46,3 +46,5 @@ const PRECIOS_REFERENCIA = {
     sal_kg: 0.6
   }
 };
+
+if (typeof module !== "undefined" && module.exports) module.exports = { PRECIOS_REFERENCIA };

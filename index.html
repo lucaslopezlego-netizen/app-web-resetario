@@ -2,223 +2,315 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="EcoMenú IA: planifica tus comidas según tu presupuesto, gustos y alergias con Inteligencia Artificial (Gemini)." />
-  <meta name="theme-color" content="#0b6b3a" />
-  <title>EcoMenú IA · Cocina inteligente por presupuesto</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥗</text></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>EcoMenú IA</title>
+  <meta name="description" content="Planifica tus comidas de la semana según tu presupuesto, gustos y alergias, con recetas generadas por Gemini." />
+  <meta name="theme-color" content="#1e140e" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%235b3a22'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23e8c79f' stroke-width='3'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://images.unsplash.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <a class="skip-link" href="#asistente">Saltar al planificador</a>
 
-  <header class="app-header">
-    <div class="container header-inner">
-      <div class="brand">
-        <span class="brand-logo" aria-hidden="true">🥗</span>
-        <div>
-          <h1 class="brand-name">EcoMenú <span class="brand-accent">IA</span></h1>
-          <p class="brand-tagline">Cocina inteligente ajustada a tu presupuesto</p>
-        </div>
+  <!-- ================= Barra superior ================= -->
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="wordmark" href="#" aria-label="EcoMenú IA, inicio">
+        <svg class="wordmark-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" /><circle cx="20" cy="20" r="11" /><path d="M7 33 33 7" /></svg>
+        <span>EcoMenú <em>IA</em></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="conexion" id="conexion" data-estado="demo"><span class="conexion-dot" aria-hidden="true"></span><span id="conexionTexto">Modo demo</span></span>
+        <button type="button" class="icon-btn" id="btnAjustes" aria-haspopup="dialog" aria-label="Ajustes de la IA">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+        </button>
       </div>
-      <button type="button" class="btn btn-ghost btn-sm" id="btnConfig" aria-expanded="false" aria-controls="configPanel">
-        <span aria-hidden="true">⚙️</span> API
-      </button>
     </div>
   </header>
 
-  <main id="main" class="container">
-
-    <!-- ===== Panel de configuración de la API ===== -->
-    <section id="configPanel" class="card config-panel" hidden aria-labelledby="configTitle">
-      <h2 id="configTitle" class="card-title">Conexión con Gemini (Google AI Studio)</h2>
-      <p class="muted">
-        Obtén tu clave gratuita en
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/app/apikey</a>.
-        La clave se usa solo desde tu navegador para llamar a la API de Google.
-      </p>
-
-      <div class="field">
-        <label for="apiKey">API Key de Gemini</label>
-        <div class="input-group">
-          <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="AIza..." />
-          <button type="button" class="btn btn-ghost btn-sm" id="btnToggleKey" aria-label="Mostrar clave">👁️</button>
+  <main>
+    <!-- ================= Portada + asistente ================= -->
+    <section class="hero">
+      <div class="hero-photos" aria-hidden="true">
+        <img src="https://images.unsplash.com/photo-1637909490319-95f2cd3ac3e3?auto=format&fit=crop&w=1400&q=70" alt="" fetchpriority="high" onerror="this.remove()" />
+      </div>
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Cocina por presupuesto</p>
+          <h1>Una semana de buena comida con el dinero que tienes.</h1>
+          <p class="lede">Dinos cuánto puedes gastar, qué te gusta y qué no puedes comer. Gemini arma una receta por día, con ingredientes, precios y pasos, sin pasarse del presupuesto.</p>
+          <ul class="hero-facts">
+            <li><strong>1 a 7</strong><span>días por plan</span></li>
+            <li><strong id="factPrecios">33</strong><span>precios de referencia</span></li>
+            <li><strong>1</strong><span>receta por día, con pasos</span></li>
+          </ul>
         </div>
-      </div>
 
-      <div class="field">
-        <label for="modelo">Modelo</label>
-        <select id="modelo">
-          <option value="gemini-2.5-flash" selected>gemini-2.5-flash (recomendado)</option>
-          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (más rápido)</option>
-          <option value="gemini-2.5-pro">gemini-2.5-pro (más preciso)</option>
-        </select>
-        <input type="text" id="modeloCustom" placeholder="…u otro modelo (opcional), ej. gemini-3-flash" spellcheck="false" />
-      </div>
+        <!-- ===== Asistente paso a paso ===== -->
+        <div class="wizard" id="asistente" tabindex="-1">
+          <ol class="stepper" id="stepper" aria-label="Pasos del planificador">
+            <li><button type="button" data-ir="1" aria-current="step"><span class="stepper-n">1</span><span class="stepper-l">Presupuesto</span></button></li>
+            <li><button type="button" data-ir="2"><span class="stepper-n">2</span><span class="stepper-l">Días</span></button></li>
+            <li><button type="button" data-ir="3"><span class="stepper-n">3</span><span class="stepper-l">Gustos</span></button></li>
+            <li><button type="button" data-ir="4"><span class="stepper-n">4</span><span class="stepper-l">Alergias</span></button></li>
+            <li><button type="button" data-ir="5"><span class="stepper-n">5</span><span class="stepper-l">Confirmar</span></button></li>
+          </ol>
+          <div class="stepper-track" aria-hidden="true"><div class="stepper-fill" id="stepperFill"></div></div>
 
-      <label class="checkbox">
-        <input type="checkbox" id="recordarKey" />
-        <span>Recordar clave en este dispositivo (localStorage)</span>
-      </label>
+          <form id="formMenu" novalidate>
+            <!-- Paso 1 -->
+            <div class="step" data-step="1" role="group" aria-labelledby="paso1">
+              <h2 class="step-title" id="paso1">¿Cuánto quieres gastar en total?</h2>
+              <p class="step-sub">Es el dinero para comprar todos los ingredientes del plan.</p>
 
-      <div class="actions-row">
-        <button type="button" class="btn btn-primary btn-sm" id="btnGuardarConfig">Guardar</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="btnBorrarKey">Borrar clave</button>
-      </div>
-      <p class="hint">
-        ⚠️ Para un sitio público en producción, no expongas tu clave en el frontend:
-        usa un pequeño proxy/backend. Esta app está pensada para uso personal.
-      </p>
-    </section>
+              <div class="money">
+                <label class="sr-only" for="moneda">Moneda</label>
+                <select id="moneda" class="money-cur">
+                  <option value="USD">USD</option><option value="EUR">EUR</option><option value="MXN">MXN</option>
+                  <option value="ARS">ARS</option><option value="COP">COP</option><option value="CLP">CLP</option>
+                  <option value="PEN">PEN</option><option value="BOB">BOB</option><option value="UYU">UYU</option>
+                  <option value="GTQ">GTQ</option><option value="DOP">DOP</option>
+                </select>
+                <label class="sr-only" for="presupuesto">Presupuesto total</label>
+                <input id="presupuesto" class="money-input" type="number" inputmode="decimal" min="1" step="0.5" value="40" />
+              </div>
+              <input id="presupuestoRango" class="range" type="range" min="5" max="200" step="1" value="40" aria-label="Ajustar presupuesto" />
+              <div class="quick" id="quickMontos" role="group" aria-label="Montos rápidos">
+                <button type="button" data-monto="20">20</button>
+                <button type="button" data-monto="40">40</button>
+                <button type="button" data-monto="60">60</button>
+                <button type="button" data-monto="100">100</button>
+              </div>
 
-    <!-- ===== Formulario ===== -->
-    <section class="card" aria-labelledby="formTitle">
-      <h2 id="formTitle" class="card-title">Planifica tu menú</h2>
-
-      <form id="formMenu" novalidate>
-        <div class="grid-2">
-          <div class="field">
-            <label for="presupuesto">Presupuesto total <span class="req" aria-hidden="true">*</span></label>
-            <div class="input-group">
-              <select id="moneda" aria-label="Moneda" class="select-currency">
-                <option value="USD" selected>USD $</option>
-                <option value="EUR">EUR €</option>
-                <option value="MXN">MXN $</option>
-                <option value="ARS">ARS $</option>
-                <option value="COP">COP $</option>
-                <option value="CLP">CLP $</option>
-                <option value="PEN">PEN S/</option>
-                <option value="BOB">BOB Bs</option>
-                <option value="UYU">UYU $</option>
-                <option value="GTQ">GTQ Q</option>
-                <option value="DOP">DOP $</option>
-              </select>
-              <input type="number" id="presupuesto" inputmode="decimal" min="1" step="0.01" placeholder="Ej: 40" required />
+              <div class="insight" id="insight" aria-live="polite">
+                <div class="insight-num"><span id="insightValor">—</span><small>por plato servido</small></div>
+                <div class="insight-meter" aria-hidden="true"><span id="insightMeter"></span></div>
+                <p class="insight-txt" id="insightTexto"></p>
+              </div>
+              <p class="field-error" id="errPresupuesto" role="alert"></p>
             </div>
-            <p class="error-msg" id="errPresupuesto" role="alert"></p>
-          </div>
 
-          <div class="field">
-            <label for="dias">Días a planificar <span class="req" aria-hidden="true">*</span></label>
-            <select id="dias" required>
-              <option value="1">1 día</option>
-              <option value="2">2 días</option>
-              <option value="3" selected>3 días</option>
-              <option value="4">4 días</option>
-              <option value="5">5 días</option>
-              <option value="6">6 días</option>
-              <option value="7">7 días</option>
-            </select>
-          </div>
+            <!-- Paso 2 -->
+            <div class="step" data-step="2" role="group" aria-labelledby="paso2" hidden>
+              <h2 class="step-title" id="paso2">¿Para cuántos días y personas?</h2>
+              <p class="step-sub">Toca el último día de tu plan. Empezamos el lunes.</p>
 
-          <div class="field">
-            <label for="personas">Personas</label>
-            <select id="personas">
-              <option value="1">1 persona</option>
-              <option value="2" selected>2 personas</option>
-              <option value="3">3 personas</option>
-              <option value="4">4 personas</option>
-              <option value="5">5 personas</option>
-              <option value="6">6 personas</option>
-            </select>
-          </div>
+              <div class="week" id="semana" role="radiogroup" aria-label="Días a planificar">
+                <button type="button" role="radio" data-dias="1"><b>L</b><span>1</span></button>
+                <button type="button" role="radio" data-dias="2"><b>M</b><span>2</span></button>
+                <button type="button" role="radio" data-dias="3"><b>X</b><span>3</span></button>
+                <button type="button" role="radio" data-dias="4"><b>J</b><span>4</span></button>
+                <button type="button" role="radio" data-dias="5"><b>V</b><span>5</span></button>
+                <button type="button" role="radio" data-dias="6"><b>S</b><span>6</span></button>
+                <button type="button" role="radio" data-dias="7"><b>D</b><span>7</span></button>
+              </div>
+              <p class="week-label" id="semanaTexto">Plan de 3 días</p>
 
-          <div class="field">
-            <label for="comida">Comida del día</label>
-            <select id="comida">
-              <option value="almuerzo" selected>Almuerzo</option>
-              <option value="cena">Cena</option>
-              <option value="desayuno">Desayuno</option>
-            </select>
+              <div class="row-split">
+                <span class="label-strong" id="personasLabel">Personas</span>
+                <div class="stepper-num" role="group" aria-labelledby="personasLabel">
+                  <button type="button" id="menosPersonas" aria-label="Una persona menos">−</button>
+                  <output id="personas" aria-live="polite">2</output>
+                  <button type="button" id="masPersonas" aria-label="Una persona más">+</button>
+                </div>
+              </div>
+
+              <p class="label-strong">¿Qué comida del día?</p>
+              <div class="photo-options photo-options-3" role="radiogroup" aria-label="Comida del día" id="comidas">
+                <label class="photo-opt">
+                  <input type="radio" name="comida" value="desayuno" />
+                  <img src="https://images.unsplash.com/photo-1787559793297-8494fb140c9f?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" />
+                  <span>Desayuno</span>
+                </label>
+                <label class="photo-opt">
+                  <input type="radio" name="comida" value="almuerzo" checked />
+                  <img src="https://images.unsplash.com/photo-1708184528306-f75a0a5118ee?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" />
+                  <span>Almuerzo</span>
+                </label>
+                <label class="photo-opt">
+                  <input type="radio" name="comida" value="cena" />
+                  <img src="https://images.unsplash.com/photo-1658661521707-56d8955f6c19?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" />
+                  <span>Cena</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Paso 3 -->
+            <div class="step" data-step="3" role="group" aria-labelledby="paso3" hidden>
+              <h2 class="step-title" id="paso3">¿Qué te gusta comer?</h2>
+              <p class="step-sub">Elige todos los que quieras. También puedes escribir otros.</p>
+              <div class="photo-options" id="gustosOpciones">
+                <label class="photo-opt"><input type="checkbox" value="Comida casera" /><img src="https://images.unsplash.com/photo-1563321442-a7f77abda173?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Casera</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Vegetariana" /><img src="https://images.unsplash.com/photo-1791208843014-69ab842736d0?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Vegetariana</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Rápida (menos de 30 min)" /><img src="https://images.unsplash.com/photo-1585975754487-25489eabf36a?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Rápida</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Italiana" /><img src="https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Italiana</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Mexicana" /><img src="https://images.unsplash.com/photo-1644085128237-9ba593123ac3?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Mexicana</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Guisos y legumbres" /><img src="https://images.unsplash.com/photo-1716089559655-ec0861f1c795?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Guisos</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Alta en proteína" /><img src="https://images.unsplash.com/photo-1765774011646-5169f3d39050?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Proteica</span></label>
+                <label class="photo-opt"><input type="checkbox" value="Sabores del mundo (curry, especias)" /><img src="https://images.unsplash.com/photo-1786114621205-f749474d9f2c?auto=format&fit=crop&w=400&h=300&q=60" alt="" loading="lazy" /><span>Especiada</span></label>
+              </div>
+              <div class="tag-input">
+                <ul class="tags" id="gustosTags" aria-live="polite"></ul>
+                <label class="sr-only" for="gustosInput">Otro gusto</label>
+                <input type="text" id="gustosInput" placeholder="Otro gusto y Enter, ej. peruana" autocomplete="off" />
+              </div>
+            </div>
+
+            <!-- Paso 4 -->
+            <div class="step" data-step="4" role="group" aria-labelledby="paso4" hidden>
+              <h2 class="step-title" id="paso4">¿Algo que no puedas comer?</h2>
+              <p class="step-sub">Ningún ingrediente con estos alérgenos entrará en tus recetas.</p>
+              <div class="allergens" id="alergiasOpciones">
+                <label class="allergen"><input type="checkbox" value="Gluten" /><span>Gluten</span></label>
+                <label class="allergen"><input type="checkbox" value="Lactosa" /><span>Lactosa</span></label>
+                <label class="allergen"><input type="checkbox" value="Huevo" /><span>Huevo</span></label>
+                <label class="allergen"><input type="checkbox" value="Frutos secos" /><span>Frutos secos</span></label>
+                <label class="allergen"><input type="checkbox" value="Mariscos" /><span>Mariscos</span></label>
+                <label class="allergen"><input type="checkbox" value="Pescado" /><span>Pescado</span></label>
+                <label class="allergen"><input type="checkbox" value="Soja" /><span>Soja</span></label>
+                <label class="allergen"><input type="checkbox" value="Cerdo" /><span>Cerdo</span></label>
+              </div>
+              <div class="tag-input tag-input-danger">
+                <ul class="tags" id="alergiasTags" aria-live="polite"></ul>
+                <label class="sr-only" for="alergiasInput">Otra restricción</label>
+                <input type="text" id="alergiasInput" placeholder="Otra restricción y Enter, ej. picante" autocomplete="off" />
+              </div>
+              <label class="label-strong" for="notas">Notas para el chef <span class="optional">opcional</span></label>
+              <textarea id="notas" rows="2" placeholder="Ej. ya tengo arroz y aceite, no tengo horno"></textarea>
+            </div>
+
+            <!-- Paso 5 -->
+            <div class="step" data-step="5" role="group" aria-labelledby="paso5" hidden>
+              <h2 class="step-title" id="paso5">Revisa tu pedido</h2>
+              <p class="step-sub">Toca cualquier línea para cambiarla.</p>
+              <dl class="review" id="revision"></dl>
+            </div>
+
+            <!-- Navegación -->
+            <div class="wizard-nav">
+              <button type="button" class="btn btn-quiet" id="btnAtras">Atrás</button>
+              <button type="submit" class="btn btn-primary" id="btnSiguiente">Siguiente</button>
+            </div>
+            <p class="form-status" id="statusMsg" role="status" aria-live="polite"></p>
+          </form>
+
+          <!-- Pantalla de carga -->
+          <div class="cooking" id="cargando" hidden aria-live="polite">
+            <div class="pan" aria-hidden="true"><span></span><span></span><span></span></div>
+            <p class="cooking-title" id="cargandoTitulo">Preparando tu menú</p>
+            <p class="cooking-msg" id="cargandoMsg">Revisando precios del mercado…</p>
+            <p class="cooking-time"><span id="cargandoSeg">0</span> s</p>
           </div>
         </div>
-
-        <div class="field">
-          <label for="gustosInput">Gustos / Preferencias</label>
-          <div class="chips" id="gustosSugeridos" role="group" aria-label="Sugerencias de gustos">
-            <button type="button" class="chip" data-value="Comida casera">Casera</button>
-            <button type="button" class="chip" data-value="Vegetariana">Vegetariana</button>
-            <button type="button" class="chip" data-value="Rápida (menos de 30 min)">Rápida</button>
-            <button type="button" class="chip" data-value="Italiana">Italiana</button>
-            <button type="button" class="chip" data-value="Mexicana">Mexicana</button>
-            <button type="button" class="chip" data-value="Saludable / baja en grasa">Saludable</button>
-            <button type="button" class="chip" data-value="Alta en proteína">Proteica</button>
-            <button type="button" class="chip" data-value="Picante">Picante</button>
-          </div>
-          <div class="tag-input" data-target="gustos">
-            <ul class="tags" id="gustosTags" aria-live="polite"></ul>
-            <input type="text" id="gustosInput" placeholder="Escribe y pulsa Enter (ej: asiática)" autocomplete="off" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="alergiasInput">Alergias / Restricciones</label>
-          <div class="chips" id="alergiasSugeridas" role="group" aria-label="Sugerencias de alergias">
-            <button type="button" class="chip chip-danger" data-value="Gluten">Gluten</button>
-            <button type="button" class="chip chip-danger" data-value="Lactosa">Lactosa</button>
-            <button type="button" class="chip chip-danger" data-value="Frutos secos">Frutos secos</button>
-            <button type="button" class="chip chip-danger" data-value="Mariscos">Mariscos</button>
-            <button type="button" class="chip chip-danger" data-value="Huevo">Huevo</button>
-            <button type="button" class="chip chip-danger" data-value="Cerdo">Cerdo</button>
-          </div>
-          <div class="tag-input" data-target="alergias">
-            <ul class="tags tags-danger" id="alergiasTags" aria-live="polite"></ul>
-            <input type="text" id="alergiasInput" placeholder="Escribe y pulsa Enter (ej: soja)" autocomplete="off" />
-          </div>
-        </div>
-
-        <details class="advanced">
-          <summary>Opciones avanzadas</summary>
-          <div class="field">
-            <label for="notas">Notas extra para la IA</label>
-            <textarea id="notas" rows="2" placeholder="Ej: tengo arroz y aceite en casa, no tengo horno…"></textarea>
-          </div>
-          <label class="checkbox">
-            <input type="checkbox" id="modoDemo" />
-            <span>Modo demo (sin IA, usa recetas de ejemplo locales)</span>
-          </label>
-        </details>
-
-        <button type="submit" class="btn btn-primary btn-block btn-lg" id="btnGenerar">
-          <span class="btn-label">✨ Generar Menú con IA</span>
-          <span class="spinner" aria-hidden="true"></span>
-        </button>
-        <p class="status-msg" id="statusMsg" role="status" aria-live="polite"></p>
-      </form>
+      </div>
     </section>
 
-    <!-- ===== Resultados ===== -->
-    <section id="resultados" class="resultados" hidden aria-labelledby="resTitle" tabindex="-1">
-      <div class="card resumen">
-        <div class="resumen-head">
-          <h2 id="resTitle" class="card-title">Tu plan de comidas</h2>
-          <div class="actions-row">
-            <button type="button" class="btn btn-ghost btn-sm" id="btnExpandir">Expandir todo</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btnImprimir">🖨️ Imprimir</button>
+    <!-- ================= Resultados ================= -->
+    <section class="results" id="resultados" hidden tabindex="-1" aria-labelledby="resTitulo">
+      <div class="wrap">
+        <div class="results-head">
+          <div>
+            <p class="eyebrow eyebrow-dark" id="resEyebrow">Tu plan</p>
+            <h2 id="resTitulo">Menú de 3 días</h2>
+          </div>
+          <div class="results-actions">
+            <button type="button" class="btn btn-quiet" id="btnNuevo">Nuevo plan</button>
+            <button type="button" class="btn btn-primary" id="btnCopiar">Copiar lista de compras</button>
           </div>
         </div>
-        <div id="resumenContenido"></div>
+
+        <div class="budget" id="presupuestoPanel"></div>
+
+        <div class="day-strip" id="tiraDias" role="tablist" aria-label="Días del menú"></div>
+
+        <article class="day" id="detalleDia" role="tabpanel" aria-live="polite"></article>
+
+        <section class="ticket" aria-labelledby="ticketTitulo">
+          <div class="ticket-paper">
+            <h3 id="ticketTitulo">Lista de compras</h3>
+            <p class="ticket-sub" id="ticketSub"></p>
+            <ul class="ticket-list" id="ticketLista"></ul>
+            <div class="ticket-total" id="ticketTotal"></div>
+            <p class="ticket-foot">Precios estimados · pueden variar en tu mercado</p>
+          </div>
+        </section>
       </div>
-
-      <div id="diasContenedor" class="dias"></div>
-
-      <details class="card compras" id="listaCompras">
-        <summary class="day-summary">
-          <span class="day-title">🛒 Lista de compras consolidada</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </summary>
-        <div class="day-body" id="comprasContenido"></div>
-      </details>
     </section>
   </main>
 
-  <footer class="app-footer">
-    <div class="container">
-      <p>EcoMenú IA · Precios estimados de referencia, pueden variar según tu zona.</p>
+  <footer class="footer">
+    <div class="wrap">
+      <p>EcoMenú IA · Recetas generadas con Gemini · Fotos de <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></p>
     </div>
   </footer>
 
+  <!-- ================= Modo cocina ================= -->
+  <dialog class="kitchen" id="modoCocina" aria-labelledby="cocinaPlato">
+    <div class="kitchen-inner">
+      <div class="kitchen-top">
+        <p class="eyebrow" id="cocinaDia">Día 1</p>
+        <button type="button" class="icon-btn icon-btn-light" id="cerrarCocina" aria-label="Cerrar modo cocina">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <h2 id="cocinaPlato">Platillo</h2>
+      <div class="kitchen-progress" aria-hidden="true"><span id="cocinaBarra"></span></div>
+      <p class="kitchen-count" id="cocinaContador">Paso 1 de 5</p>
+      <p class="kitchen-step" id="cocinaPaso"></p>
+      <div class="kitchen-timer" id="cocinaTimer" hidden>
+        <button type="button" class="btn btn-light" id="btnTimer">Iniciar temporizador</button>
+        <span class="kitchen-clock" id="cocinaReloj">00:00</span>
+      </div>
+      <div class="kitchen-nav">
+        <button type="button" class="btn btn-ghost-light" id="cocinaAnterior">Anterior</button>
+        <button type="button" class="btn btn-light" id="cocinaSiguiente">Siguiente paso</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ================= Ajustes ================= -->
+  <dialog class="sheet" id="ajustes" aria-labelledby="ajustesTitulo">
+    <form method="dialog" class="sheet-inner" id="formAjustes">
+      <div class="sheet-head">
+        <h2 id="ajustesTitulo">Conexión con Gemini</h2>
+        <button type="submit" value="cancel" class="icon-btn" aria-label="Cerrar ajustes">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="muted" id="ajustesOrigen"></p>
+      <label class="label-strong" for="apiKey">API Key de Google AI Studio</label>
+      <div class="key-row">
+        <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="Pega tu clave aquí" />
+        <button type="button" class="btn btn-quiet btn-sm" id="btnVerKey">Mostrar</button>
+      </div>
+      <label class="label-strong" for="modelo">Modelo</label>
+      <select id="modelo">
+        <option value="auto">Automático (recomendado)</option>
+        <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+        <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+        <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+        <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
+      </select>
+      <p class="hint">En automático, si un modelo está saturado se prueba el siguiente.</p>
+      <label class="check"><input type="checkbox" id="recordarKey" /><span>Recordar la clave en este navegador</span></label>
+      <label class="check"><input type="checkbox" id="modoDemo" /><span>Usar recetas de ejemplo (sin IA)</span></label>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-quiet" id="btnBorrarKey">Borrar clave</button>
+        <button type="submit" value="save" class="btn btn-primary" id="btnGuardarAjustes">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/config.local.js" onerror="this.remove()"></script>
   <script src="js/precios.js"></script>
+  <script src="js/ecomenu-core.js"></script>
+  <script src="js/fotos.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/app.js"></script>
 </body>
