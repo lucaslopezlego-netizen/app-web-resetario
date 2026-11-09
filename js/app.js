@@ -351,7 +351,7 @@
         if (res.status === 404 || res.status === 405 || res.status === 501) throw new SinServidor();
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          if (/GEMINI_API_KEY/.test(data.error || "")) throw new SinServidor();
+          if (/GEMINI_API_KEY/.test(data.error || "")) { state.motivoDemo = "vercel-sin-clave"; throw new SinServidor(); }
           throw new Error(data.error || `El servidor respondió ${res.status}.`);
         }
         return { plan: data.plan, modelo: data.modelo, fuente: "servidor" };
@@ -555,7 +555,13 @@
     const maxDia = Math.max(...plan.dias.map((d) => d.costo_dia), 0.01);
     const porTipo = Object.fromEntries(datos.comidas.map((t) => [t, round2(plan.dias.reduce((s, d) => s + (d.comidas.find((c) => c.tipo === t)?.costo || 0), 0))]));
     const avisos = [];
-    if (plan.fuente === "demo") avisos.push(["info", claveActiva() || enServidorWeb() ? "Estás viendo recetas de ejemplo. Desactiva el modo de ejemplo en Ajustes para usar Gemini." : "Estás viendo recetas de ejemplo porque no hay una clave de Gemini configurada. Agrégala en Ajustes."]);
+    if (plan.fuente === "demo") {
+      let motivo;
+      if (ajustes.demo) motivo = "Estás viendo recetas de ejemplo porque el modo de ejemplo está activado. Desactívalo en Menú → Ajustes de la IA.";
+      else if (state.motivoDemo === "vercel-sin-clave") motivo = "Estás viendo recetas de ejemplo: la app está publicada pero falta la variable GEMINI_API_KEY en Vercel (Settings → Environment Variables). También puedes pegar tu clave en Menú → Ajustes de la IA.";
+      else motivo = "Estás viendo recetas de ejemplo porque no hay una clave de Gemini. Pégala en Menú → Ajustes de la IA y marca «Recordar la clave».";
+      avisos.push(["info", motivo]);
+    }
     if (gastar > pres) avisos.push(["danger", "El menú supera tu presupuesto. Marca lo que ya tienes en casa, cambia alguna receta o reduce días, comidas o personas."]);
     const conflictos = detectarConflictos(plan);
     if (conflictos.length) avisos.push(["danger", `Revisa posibles alérgenos: ${conflictos.join("; ")}.`]);
