@@ -17,7 +17,7 @@
    * Orden de preferencia. Si uno falla por saturación o no existe, se prueba el siguiente.
    * Primero el ligero: con recetas sencillas responde en 5–15 s (flash tardaba 30–45 s y Vercel corta a los 60 s).
    */
-  const MODELOS = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-lite-latest"];
+  const MODELOS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.5-flash"];
 
   const COMIDAS = ["desayuno", "almuerzo", "cena"];
   const NOMBRES_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
@@ -263,21 +263,28 @@
     const userPrompt = construirUserPrompt(d, e);
     let ultimo;
     for (const [i, model] of modelos.entries()) {
-      // Con "limite" (hora tope absoluta) se reparte el tiempo para que siempre quede margen para el siguiente modelo.
-      let espera = i === 0 && primeroMs ? Math.min(timeoutMs, primeroMs) : timeoutMs;
-      if (limite) {
-        const queda = limite - Date.now() - 1500;
-        if (queda < 6000) break;
-        espera = Math.min(espera, queda);
+      // Gemini a veces responde "saturado" (503) solo por un instante: se reintenta el mismo modelo una vez antes de pasar al siguiente.
+      for (let intento = 0; intento < 2; intento++) {
+        // Con "limite" (hora tope absoluta) se reparte el tiempo para que siempre quede margen para el siguiente modelo.
+        let espera = i === 0 && intento === 0 && primeroMs ? Math.min(timeoutMs, primeroMs) : timeoutMs;
+        if (limite) {
+          const queda = limite - Date.now() - 1500;
+          if (queda < 6000) break;
+          espera = Math.min(espera, queda);
+        }
+        try {
+          if (onModelo) onModelo(model);
+          const plan = await llamarModelo({ apiKey, model, systemPrompt, userPrompt, timeoutMs: espera });
+          return { plan, modelo: model };
+        } catch (err) {
+          ultimo = err;
+          if (!(err instanceof EcoError) || !err.reintentable) throw err;
+          const saturado = err.status === 503 || err.status === 500;
+          if (!saturado || intento === 1) break;
+          await new Promise((r) => setTimeout(r, 1200));
+        }
       }
-      try {
-        if (onModelo) onModelo(model);
-        const plan = await llamarModelo({ apiKey, model, systemPrompt, userPrompt, timeoutMs: espera });
-        return { plan, modelo: model };
-      } catch (err) {
-        ultimo = err;
-        if (!(err instanceof EcoError) || !err.reintentable) throw err;
-      }
+      if (limite && limite - Date.now() < 7500) break;
     }
     throw ultimo || new EcoError("Gemini tardó demasiado en responder. Vuelve a intentarlo.", { reintentable: true });
   }

@@ -683,3 +683,7 @@ dialog::backdrop { background: rgba(20, 12, 8, .6); backdrop-filter: blur(4px); 
 .strength { height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 4px; }
 .strength span { display: block; height: 100%; width: 0; border-radius: 6px; transition: width .3s var(--ease), background .3s; }
 #formRecClave input[aria-invalid="true"], #formRecCodigo input[aria-invalid="true"], #formRecCorreo input[aria-invalid="true"] { border-color: var(--danger); }
+
+/* Aviso de recetas de ejemplo con botón para generar con IA */
+.alert-accion { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.alert-accion p { flex: 1 1 260px; margin: 0; }

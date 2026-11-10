@@ -334,7 +334,7 @@
 
   /** Pide un plan a la fuente disponible. Devuelve { plan, modelo, fuente }. */
   async function pedirPlan(datos, extra = {}) {
-    if (ajustes.demo) return { plan: generarPlanDemo(datos, extra), modelo: null, fuente: "demo" };
+    if (ajustes.demo) return { plan: generarPlanDemo(datos, extra), modelo: null, fuente: "demo", motivo: "ajustes" };
 
     const key = claveActiva();
     if (key) {
@@ -366,11 +366,11 @@
         } finally {
           clearTimeout(tope);
         }
-        if (res.status === 404 || res.status === 405 || res.status === 501) throw new SinServidor();
+        if (res.status === 404 || res.status === 405 || res.status === 501) throw new SinServidor(`El servidor de IA no respondió (código ${res.status}).`);
         const tipo = res.headers.get("content-type") || "";
         const data = tipo.includes("json") ? await res.json().catch(() => ({})) : {};
         if (!res.ok) {
-          if (/GEMINI_API_KEY/.test(data.error || "")) { state.motivoDemo = "vercel-sin-clave"; throw new SinServidor(); }
+          if (/GEMINI_API_KEY/.test(data.error || "")) { state.motivoDemo = "vercel-sin-clave"; throw new SinServidor("Falta la clave de Gemini en Vercel."); }
           const msg = data.error || (res.status === 504 ? "La IA tardó demasiado en responder. Vuelve a intentarlo." : `El servidor respondió ${res.status}.`);
           throw new ErrorServidor(msg, res.status !== 429 && (res.status >= 500 || !!data.reintentable || !tipo.includes("json")));
         }
@@ -389,10 +389,15 @@
       } catch (err) {
         // Solo sin servidor de IA (404) o sin clave en Vercel se pasa a recetas de ejemplo; cualquier otro fallo se muestra.
         if (!(err instanceof SinServidor)) throw err;
+        // Si /api/config dijo que el servidor SÍ tiene Gemini, no se disimula con recetas de ejemplo: se muestra el error.
+        if (EcoCuentas.geminiEnServidor === true && state.motivoDemo !== "vercel-sin-clave") {
+          throw new Error(`${err.message} Vuelve a intentarlo en un momento.`);
+        }
         state.sinServidor = true; actualizarConexion();
+        return { plan: generarPlanDemo(datos, extra), modelo: null, fuente: "demo", motivo: state.motivoDemo || "sin-servidor" };
       }
     }
-    return { plan: generarPlanDemo(datos, extra), modelo: null, fuente: "demo" };
+    return { plan: generarPlanDemo(datos, extra), modelo: null, fuente: "demo", motivo: "sin-clave" };
   }
 
   function normalizarReceta(r, tipo, personas) {
@@ -441,7 +446,7 @@
     const datos = core.sanearDatos(state.datos);
     mostrarCarga(true);
     try {
-      let { plan: raw, modelo, fuente } = await pedirPlan(datos);
+      let { plan: raw, modelo, fuente, motivo } = await pedirPlan(datos);
       let plan = normalizarPlan(raw, datos);
 
       if (fuente !== "demo" && totalPlan(plan) > datos.presupuesto) {
@@ -455,6 +460,7 @@
       }
 
       plan.fuente = fuente; plan.modelo = modelo; plan.creado = Date.now();
+      if (fuente === "demo") plan.motivoDemo = motivo;
       state.plan = plan; state.menuId = `m_${Date.now().toString(36)}`; state.diaSel = 0; state.comidaSel = 0;
       state.tengo = new Set(); state.hechos = new Set();
       guardarPlan();
@@ -587,12 +593,16 @@
     const maxDia = Math.max(...plan.dias.map((d) => d.costo_dia), 0.01);
     const porTipo = Object.fromEntries(datos.comidas.map((t) => [t, round2(plan.dias.reduce((s, d) => s + (d.comidas.find((c) => c.tipo === t)?.costo || 0), 0))]));
     const avisos = [];
+    let avisoIA = "";
     if (plan.fuente === "demo") {
+      const iaDisponible = !!claveActiva() || EcoCuentas.geminiEnServidor === true;
       let motivo;
-      if (ajustes.demo) motivo = "Estás viendo recetas de ejemplo porque el modo de ejemplo está activado. Desactívalo en Menú → Ajustes de la IA.";
-      else if (state.motivoDemo === "vercel-sin-clave") motivo = "Estás viendo recetas de ejemplo: la app está publicada pero falta la variable GEMINI_API_KEY en Vercel (Settings → Environment Variables). También puedes pegar tu clave en Menú → Ajustes de la IA.";
-      else motivo = "Estás viendo recetas de ejemplo porque no hay una clave de Gemini. Pégala en Menú → Ajustes de la IA y marca «Recordar la clave».";
-      avisos.push(["info", motivo]);
+      if (ajustes.demo) motivo = "Este menú usa recetas de ejemplo porque está activada la opción «Usar recetas de ejemplo» en Ajustes.";
+      else if (iaDisponible) motivo = "Este menú se generó con recetas de ejemplo, antes de que la IA estuviera conectada. La IA ya está lista.";
+      else if ((plan.motivoDemo || state.motivoDemo) === "vercel-sin-clave") motivo = "Este menú usa recetas de ejemplo porque falta la variable GEMINI_API_KEY en Vercel (Settings → Environment Variables).";
+      else motivo = "Este menú usa recetas de ejemplo porque no hay una clave de Gemini. Pégala en Menú → Ajustes de la IA y marca «Recordar la clave».";
+      avisoIA = `<div class="alert alert-info alert-accion"><p>${esc(motivo)}</p>${ajustes.demo || iaDisponible
+        ? `<button type="button" class="btn btn-primary btn-sm" data-accion="generar-ia">Generar este menú con IA</button>` : ""}</div>`;
     }
     if (gastar > pres) avisos.push(["danger", "El menú supera tu presupuesto. Marca lo que ya tienes en casa, cambia alguna receta o reduce días, comidas o personas."]);
     const conflictos = detectarConflictos(plan);
@@ -629,6 +639,7 @@
         <div class="bars-labels" aria-hidden="true">${plan.dias.map((_, i) => `<span>${diaPlan(i).slice(0, 3)}</span>`).join("")}</div>
       </div>
       ${plan.comentario ? `<p class="budget-note">${esc(plan.comentario)}</p>` : ""}
+      ${avisoIA}
       ${avisos.map(([t, m]) => `<p class="alert alert-${t}">${esc(m)}</p>`).join("")}`;
 
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -672,6 +683,14 @@
     seleccionar((state.diaSel + delta + n) % n, state.comidaSel, true);
   });
   $("#presupuestoPanel").addEventListener("click", (e) => {
+    if (e.target.closest('[data-accion="generar-ia"]')) {
+      if (ajustes.demo) { ajustes.demo = false; store.set(K.demo, false); }
+      state.sinServidor = false; state.motivoDemo = null;
+      if (state.plan?.datos) { state.datos = { ...state.datos, ...state.plan.datos }; guardarDatos(); }
+      $("#planificador").scrollIntoView({ behavior: "smooth", block: "start" });
+      generarPlan();
+      return;
+    }
     const b = e.target.closest(".bar"); if (!b) return;
     seleccionar(Number(b.dataset.dia), state.comidaSel);
     $("#detalleDia").scrollIntoView({ behavior: "smooth", block: "start" });

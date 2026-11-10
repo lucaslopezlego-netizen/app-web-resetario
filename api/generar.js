@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
   const limite = inicio + 55000;
   // "rapido": reintento pedido por la app tras una demora; va directo a los modelos ligeros.
   const rapido = !!(body.extra && body.extra.rapido);
-  const base = rapido ? ["gemini-flash-lite-latest", "gemini-3.1-flash-lite"] : core.MODELOS;
+  const base = rapido ? ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] : core.MODELOS;
   const modelos = [...new Set(process.env.GEMINI_MODEL && !rapido ? [process.env.GEMINI_MODEL, ...base] : base)];
 
   try {
