@@ -4,6 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Eco Menú</title>
+  <script>
+    /* Una sola dirección para la app: el navegador guarda la sesión por dirección, así que los enlaces de cada
+       publicación de Vercel (…-lucaslopezlego-netizen.vercel.app) y el proyecto duplicado llevan a la principal. */
+    (function () {
+      var PRINCIPAL = "app-resetario.vercel.app";
+      var h = location.hostname;
+      if (h !== PRINCIPAL && (/-lucaslopezlego-netizen\.vercel\.app$/.test(h) || h === "app-web-resetario.vercel.app")) {
+        location.replace("https://" + PRINCIPAL + location.pathname + location.search + location.hash);
+      }
+    })();
+  </script>
   <meta name="description" content="Planifica tus comidas de la semana según tu presupuesto, gustos y alergias, con recetas generadas por Gemini." />
   <meta name="theme-color" content="#1e140e" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%235b3a22'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23e8c79f' stroke-width='3'/%3E%3C/svg%3E" />
@@ -125,15 +136,11 @@
                   <option value="GTQ">GTQ</option><option value="DOP">DOP</option>
                 </select>
                 <label class="sr-only" for="presupuesto">Presupuesto total</label>
-                <input id="presupuesto" class="money-input" type="number" inputmode="decimal" min="1" step="0.5" value="40" />
+                <input id="presupuesto" class="money-input" type="number" inputmode="decimal" min="1" step="any" value="40" />
               </div>
-              <input id="presupuestoRango" class="range" type="range" min="5" max="200" step="1" value="40" aria-label="Ajustar presupuesto" />
-              <div class="quick" id="quickMontos" role="group" aria-label="Montos rápidos">
-                <button type="button" data-monto="20">20</button>
-                <button type="button" data-monto="40">40</button>
-                <button type="button" data-monto="60">60</button>
-                <button type="button" data-monto="100">100</button>
-              </div>
+              <input id="presupuestoRango" class="range" type="range" min="5" max="1000" step="5" value="40" aria-label="Ajustar presupuesto" />
+              <div class="quick" id="quickMontos" role="group" aria-label="Montos rápidos"></div>
+              <p class="hint">Puedes escribir cualquier monto, sin límite.</p>
 
               <div class="insight" id="insight" aria-live="polite">
                 <div class="insight-num"><span id="insightValor">—</span><small>por plato servido</small></div>
@@ -297,6 +304,7 @@
   <footer class="footer">
     <div class="wrap">
       <p>Eco Menú · Recetas generadas con Gemini · Fotos de <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></p>
+      <p class="hecha-por">Hecha por <strong id="yourland">Yourland</strong></p>
     </div>
   </footer>
 

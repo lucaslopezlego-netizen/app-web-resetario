@@ -150,6 +150,29 @@
   /* ---------------- Paso 1: presupuesto ---------------- */
   const inpPres = $("#presupuesto"), rango = $("#presupuestoRango"), selMoneda = $("#moneda");
 
+  /** Rango de la barra y montos rápidos según la moneda: [mínimo, máximo, paso, montos rápidos]. El campo de texto no tiene tope. */
+  const RANGOS = {
+    USD: [5, 1000, 5, [20, 50, 100, 200, 500]],
+    EUR: [5, 1000, 5, [20, 50, 100, 200, 500]],
+    MXN: [100, 20000, 100, [500, 1000, 2000, 4000, 8000]],
+    ARS: [5000, 2000000, 5000, [20000, 50000, 100000, 200000, 500000]],
+    COP: [20000, 4000000, 10000, [100000, 200000, 400000, 800000, 1500000]],
+    CLP: [5000, 1000000, 5000, [20000, 50000, 100000, 200000, 400000]],
+    PEN: [20, 4000, 10, [100, 200, 400, 800, 1500]],
+    BOB: [30, 7000, 10, [150, 300, 600, 1200, 2500]],
+    UYU: [200, 40000, 100, [1000, 2000, 4000, 8000, 15000]],
+    GTQ: [40, 8000, 10, [150, 300, 600, 1200, 3000]],
+    DOP: [300, 60000, 100, [1500, 3000, 6000, 12000, 25000]]
+  };
+  const rangoDe = (m) => RANGOS[m] || RANGOS.USD;
+  const miles = (n) => new Intl.NumberFormat("es").format(n);
+
+  function pintarRangoMoneda() {
+    const [min, max, paso, rapidos] = rangoDe(state.datos.moneda);
+    rango.min = min; rango.max = max; rango.step = paso;
+    $("#quickMontos").innerHTML = rapidos.map((m) => `<button type="button" data-monto="${m}">${miles(m)}</button>`).join("");
+  }
+
   function sincronizarPresupuesto(valor, origen) {
     const v = Math.max(0, num(valor, 0));
     state.datos.presupuesto = round2(v);
@@ -187,7 +210,16 @@
   inpPres.addEventListener("input", () => sincronizarPresupuesto(inpPres.value, "input"));
   rango.addEventListener("input", () => sincronizarPresupuesto(rango.value, "rango"));
   $("#quickMontos").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) sincronizarPresupuesto(b.dataset.monto); });
-  selMoneda.addEventListener("change", () => { state.datos.moneda = selMoneda.value; actualizarInsight(); guardarDatos(); });
+  selMoneda.addEventListener("change", () => {
+    // Al cambiar de moneda se convierte el monto de forma aproximada y se redondea a un número cómodo.
+    const antes = state.datos.moneda, ahora = selMoneda.value;
+    const usd = state.datos.presupuesto * (A_USD[antes] || 1);
+    state.datos.moneda = ahora;
+    pintarRangoMoneda();
+    const [, , paso] = rangoDe(ahora);
+    const convertido = Math.max(paso, Math.round(usd / (A_USD[ahora] || 1) / paso) * paso);
+    sincronizarPresupuesto(convertido);
+  });
 
   /* ---------------- Paso 2: días, personas y comidas ---------------- */
   /** "Lunes, miércoles y viernes" o "Lunes a viernes" si son seguidos. */
@@ -1027,8 +1059,10 @@
   function abrirAuth(modo) {
     fijarModoAuth(modo);
     $("#authClave").value = "";
+    const ultimo = store.get("eco.ultimoCorreo", "");
+    if (modo === "entrar" && ultimo && !$("#authCorreo").value) $("#authCorreo").value = ultimo;
     dlgAuth.showModal();
-    (modo === "crear" ? $("#authNombre") : $("#authCorreo")).focus();
+    (modo === "crear" ? $("#authNombre") : $("#authCorreo").value ? $("#authClave") : $("#authCorreo")).focus();
   }
 
   document.addEventListener("click", (e) => {
@@ -1242,6 +1276,7 @@
       await EcoCuentas.preparar();
       const datos = { nombre: $("#authNombre").value, correo: $("#authCorreo").value, clave: $("#authClave").value };
       const u = modoAuth === "crear" ? await EcoCuentas.crear(datos) : await EcoCuentas.entrar(datos);
+      store.set("eco.ultimoCorreo", u.correo);
       btn.textContent = "Cargando tus menús…";
       await EcoCuentas.sincronizar();
       dlgAuth.close();
@@ -1289,6 +1324,7 @@
     $("#menuCorreo").textContent = u.correo;
     selMoneda.value = state.datos.moneda;
     $("#notas").value = state.datos.notas || "";
+    pintarRangoMoneda();
     sincronizarPresupuesto(state.datos.presupuesto);
     renderSemana(); renderComidas();
     renderGrupo("gustos"); renderGrupo("alergias");

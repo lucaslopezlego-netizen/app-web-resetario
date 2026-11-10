@@ -687,3 +687,9 @@ dialog::backdrop { background: rgba(20, 12, 8, .6); backdrop-filter: blur(4px); 
 /* Aviso de recetas de ejemplo con botón para generar con IA */
 .alert-accion { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .alert-accion p { flex: 1 1 260px; margin: 0; }
+
+/* Pie: hecha por Yourland */
+.footer .wrap { display: grid; gap: 6px; }
+.hecha-por { font-size: var(--t-sm); color: var(--ink); }
+.hecha-por a, .hecha-por strong { font-family: var(--f-display); font-weight: 400; font-size: 1.05rem; color: var(--accent); text-decoration: none; }
+.hecha-por a:hover { text-decoration: underline; text-underline-offset: 3px; }
