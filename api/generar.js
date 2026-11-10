@@ -28,15 +28,23 @@ module.exports = async function handler(req, res) {
   const datos = core.sanearDatos(body.datos);
   if (!(datos.presupuesto > 0)) return res.status(400).json({ error: "El presupuesto debe ser mayor que 0." });
 
-  const modelos = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL, ...core.MODELOS] : core.MODELOS;
+  // Vercel corta la función a los 60 s (vercel.json). Se deja margen para responder.
+  const inicio = Date.now();
+  const limite = inicio + 55000;
+  // "rapido": reintento pedido por la app tras una demora; va directo a los modelos ligeros.
+  const rapido = !!(body.extra && body.extra.rapido);
+  const base = rapido ? ["gemini-flash-lite-latest", "gemini-3.1-flash-lite"] : core.MODELOS;
+  const modelos = [...new Set(process.env.GEMINI_MODEL && !rapido ? [process.env.GEMINI_MODEL, ...base] : base)];
 
   try {
     const { plan, modelo } = await core.generarConGemini({
-      apiKey, datos, extra: core.sanearExtra(body.extra), modelos: [...new Set(modelos)], timeoutMs: 50000
+      apiKey, datos, extra: core.sanearExtra(body.extra), modelos,
+      timeoutMs: 50000, primeroMs: rapido ? 45000 : 32000, limite
     });
     return res.status(200).json({ plan, modelo });
   } catch (err) {
     const status = err && err.status === 429 ? 429 : 502;
-    return res.status(status).json({ error: (err && err.message) || "Error al generar el menú." });
+    console.error("generar:", err && err.message, `${Date.now() - inicio} ms`);
+    return res.status(status).json({ error: (err && err.message) || "Error al generar el menú.", reintentable: !!(err && err.reintentable) });
   }
 };

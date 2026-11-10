@@ -328,6 +328,9 @@
   }
 
   class SinServidor extends Error {}
+  class ErrorServidor extends Error {
+    constructor(message, reintentable = false) { super(message); this.reintentable = reintentable; }
+  }
 
   /** Pide un plan a la fuente disponible. Devuelve { plan, modelo, fuente }. */
   async function pedirPlan(datos, extra = {}) {
@@ -345,19 +348,47 @@
     }
 
     if (enServidorWeb()) {
-      try {
-        const res = await fetch("api/generar", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ datos, extra })
-        });
+      /** Una llamada a la función de Vercel. `rapido` pide los modelos ligeros (para el reintento). */
+      const llamar = async (rapido) => {
+        const ctrl = new AbortController();
+        const tope = setTimeout(() => ctrl.abort(), 70000);
+        let res;
+        try {
+          res = await fetch("api/generar", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ datos, extra: rapido ? { ...extra, rapido: true } : extra }),
+            signal: ctrl.signal
+          });
+        } catch (err) {
+          throw new ErrorServidor(err?.name === "AbortError"
+            ? "La IA tardó demasiado en responder. Vuelve a intentarlo en un momento."
+            : "No se pudo conectar con el servidor. Revisa tu internet y vuelve a intentarlo.", true);
+        } finally {
+          clearTimeout(tope);
+        }
         if (res.status === 404 || res.status === 405 || res.status === 501) throw new SinServidor();
-        const data = await res.json().catch(() => ({}));
+        const tipo = res.headers.get("content-type") || "";
+        const data = tipo.includes("json") ? await res.json().catch(() => ({})) : {};
         if (!res.ok) {
           if (/GEMINI_API_KEY/.test(data.error || "")) { state.motivoDemo = "vercel-sin-clave"; throw new SinServidor(); }
-          throw new Error(data.error || `El servidor respondió ${res.status}.`);
+          const msg = data.error || (res.status === 504 ? "La IA tardó demasiado en responder. Vuelve a intentarlo." : `El servidor respondió ${res.status}.`);
+          throw new ErrorServidor(msg, res.status !== 429 && (res.status >= 500 || !!data.reintentable || !tipo.includes("json")));
         }
+        if (!data.plan) throw new ErrorServidor("El servidor no devolvió el menú. Vuelve a intentarlo.", true);
         return { plan: data.plan, modelo: data.modelo, fuente: "servidor" };
+      };
+
+      try {
+        try {
+          return await llamar(false);
+        } catch (err) {
+          if (!(err instanceof ErrorServidor) || !err.reintentable) throw err;
+          if (!$("#cargando").hidden) $("#cargandoTitulo").textContent = "Gemini va lento, probando un modelo más rápido…";
+          return await llamar(true);
+        }
       } catch (err) {
-        if (!(err instanceof SinServidor) && !(err instanceof TypeError)) throw err;
+        // Solo sin servidor de IA (404) o sin clave en Vercel se pasa a recetas de ejemplo; cualquier otro fallo se muestra.
+        if (!(err instanceof SinServidor)) throw err;
         state.sinServidor = true; actualizarConexion();
       }
     }

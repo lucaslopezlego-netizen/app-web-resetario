@@ -13,8 +13,11 @@
 
   const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
-  /** Orden de preferencia. Si uno falla por saturación o no existe, se prueba el siguiente. */
-  const MODELOS = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
+  /**
+   * Orden de preferencia. Si uno falla por saturación o no existe, se prueba el siguiente.
+   * Primero el ligero: con recetas sencillas responde en 5–15 s (flash tardaba 30–45 s y Vercel corta a los 60 s).
+   */
+  const MODELOS = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-lite-latest"];
 
   const COMIDAS = ["desayuno", "almuerzo", "cena"];
   const NOMBRES_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
@@ -253,23 +256,30 @@
    * Genera el plan probando los modelos en orden.
    * @returns {Promise<{plan: object, modelo: string}>}
    */
-  async function generarConGemini({ apiKey, datos, extra = {}, modelos = MODELOS, timeoutMs = 120000, onModelo }) {
+  async function generarConGemini({ apiKey, datos, extra = {}, modelos = MODELOS, timeoutMs = 120000, primeroMs, limite, onModelo }) {
     const d = sanearDatos(datos);
     const e = sanearExtra(extra);
     const systemPrompt = construirSystemPrompt();
     const userPrompt = construirUserPrompt(d, e);
     let ultimo;
-    for (const model of modelos) {
+    for (const [i, model] of modelos.entries()) {
+      // Con "limite" (hora tope absoluta) se reparte el tiempo para que siempre quede margen para el siguiente modelo.
+      let espera = i === 0 && primeroMs ? Math.min(timeoutMs, primeroMs) : timeoutMs;
+      if (limite) {
+        const queda = limite - Date.now() - 1500;
+        if (queda < 6000) break;
+        espera = Math.min(espera, queda);
+      }
       try {
         if (onModelo) onModelo(model);
-        const plan = await llamarModelo({ apiKey, model, systemPrompt, userPrompt, timeoutMs });
+        const plan = await llamarModelo({ apiKey, model, systemPrompt, userPrompt, timeoutMs: espera });
         return { plan, modelo: model };
       } catch (err) {
         ultimo = err;
         if (!(err instanceof EcoError) || !err.reintentable) throw err;
       }
     }
-    throw ultimo || new EcoError("No se pudo generar el menú.");
+    throw ultimo || new EcoError("Gemini tardó demasiado en responder. Vuelve a intentarlo.", { reintentable: true });
   }
 
   const api = {
