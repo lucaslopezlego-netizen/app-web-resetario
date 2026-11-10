@@ -599,7 +599,8 @@
       let motivo;
       if (ajustes.demo) motivo = "Este menú usa recetas de ejemplo porque está activada la opción «Usar recetas de ejemplo» en Ajustes.";
       else if (iaDisponible) motivo = "Este menú se generó con recetas de ejemplo, antes de que la IA estuviera conectada. La IA ya está lista.";
-      else if ((plan.motivoDemo || state.motivoDemo) === "vercel-sin-clave") motivo = "Este menú usa recetas de ejemplo porque falta la variable GEMINI_API_KEY en Vercel (Settings → Environment Variables).";
+      else if ((plan.motivoDemo || state.motivoDemo) === "vercel-sin-clave" || EcoCuentas.geminiEnServidor === false)
+        motivo = `Este menú usa recetas de ejemplo porque el proyecto de Vercel donde está publicada esta página (${location.hostname}) no tiene la variable GEMINI_API_KEY. Agrégala en Vercel → Settings → Environment Variables y vuelve a publicar.`;
       else motivo = "Este menú usa recetas de ejemplo porque no hay una clave de Gemini. Pégala en Menú → Ajustes de la IA y marca «Recordar la clave».";
       avisoIA = `<div class="alert alert-info alert-accion"><p>${esc(motivo)}</p>${ajustes.demo || iaDisponible
         ? `<button type="button" class="btn btn-primary btn-sm" data-accion="generar-ia">Generar este menú con IA</button>` : ""}</div>`;

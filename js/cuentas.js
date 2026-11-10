@@ -342,7 +342,8 @@ const EcoCuentas = (() => {
     if (preparado) return preparado;
     preparado = (async () => {
       const web = typeof location !== "undefined" && /^https?:$/.test(location.protocol);
-      if ((!cfg.url || !cfg.anonKey) && web) {
+      // Siempre se consulta: dice si el servidor tiene Gemini; los datos de Supabase solo se usan si faltan en supabase-config.js.
+      if (web) {
         try {
           const ctrl = new AbortController();
           const t = setTimeout(() => ctrl.abort(), 4000);
@@ -350,7 +351,7 @@ const EcoCuentas = (() => {
           clearTimeout(t);
           if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
             const data = await res.json();
-            if (data.supabase?.url && (!cfg.url || cfg.url === data.supabase.url)) {
+            if (data.supabase?.url && (!cfg.url || !cfg.anonKey) && (!cfg.url || cfg.url === data.supabase.url)) {
               cfg.url = data.supabase.url;
               cfg.anonKey = cfg.anonKey || data.supabase.anonKey;
             }

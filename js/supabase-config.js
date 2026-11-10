@@ -13,5 +13,5 @@
  */
 window.ECOMENU_SUPABASE = window.ECOMENU_SUPABASE || {
   url: "https://dhwduiwkyroepfhgykze.supabase.co",
-  anonKey: "" // si queda vacío y la app está en Vercel, se toma de las variables de la integración con Supabase
+  anonKey: "sb_publishable_3vev9eUWJwyJFLXgdd5NiQ_RdxxErbc" // clave pública (publishable): segura en el código, protegida por RLS
 };
