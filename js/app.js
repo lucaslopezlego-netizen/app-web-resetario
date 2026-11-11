@@ -522,6 +522,7 @@
       state.tengo = new Set(); state.hechos = new Set();
       guardarPlan();
       mostrarCarga(false);
+      state.maxPaso = 5; irAPaso(1, { foco: false });
       renderResultados(true);
       renderMisMenus(); actualizarFacts();
       toast(fuente === "demo" ? "Plan de ejemplo listo" : "Tu menú está listo");
@@ -619,7 +620,7 @@
     const plan = state.plan; if (!plan) return;
     const { datos } = plan;
     $("#resultados").hidden = false;
-    $("#resEyebrow").textContent = plan.fuente === "demo" ? "Plan de ejemplo" : `Generado con ${plan.modelo || "Gemini"}`;
+    $("#resEyebrow").textContent = plan.fuente === "demo" ? "Plan de ejemplo" : "Menú generado con IA";
     const comidasTxt = listaNatural(datos.comidas.map((c) => ETIQUETA[c].toLowerCase()));
     $("#resTitulo").textContent = `${textoDias(datos.diasSemana || plan.dias.map((_, i) => i))}: ${comidasTxt} para ${datos.personas}`;
     $("#resGuardado").hidden = !state.menuId;
@@ -1392,8 +1393,10 @@
   $("#logo").addEventListener("click", (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); });
 
   function actualizarFacts() {
-    const el = $("#factMenus");
-    if (el) el.textContent = leerMenus().length;
+    const el = $("#factMenus"), n = leerMenus().length;
+    if (el) el.textContent = n;
+    const t = $("#factMenusTxt");
+    if (t) t.textContent = n === 1 ? "menú guardado" : "menús guardados";
   }
 
   const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];

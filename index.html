@@ -53,7 +53,8 @@
       <div class="hero-photos" aria-hidden="true">
         <img src="https://images.unsplash.com/photo-1637909490319-95f2cd3ac3e3?auto=format&fit=crop&w=1400&q=70" alt="" fetchpriority="high" onerror="this.remove()" />
       </div>
-      <div class="wrap landing-inner">
+      <div class="wrap landing-grid">
+      <div class="landing-inner">
         <p class="eyebrow">Cocina por presupuesto</p>
         <h1 id="inicioTitulo">Come bien toda la semana con el dinero que tienes.</h1>
         <p class="lede">Eco Menú arma tu desayuno, almuerzo y cena con recetas reales, precios estimados y la lista de compras lista para el mercado.</p>
@@ -62,6 +63,28 @@
           <button type="button" class="btn btn-ghost-light btn-lg" data-auth="entrar">Ya tengo cuenta</button>
         </div>
         <p class="landing-note" id="notaSesion">Tu sesión queda guardada en este dispositivo.</p>
+      </div>
+
+      <!-- Muestra de cómo se ve un menú (ejemplo estático) -->
+      <figure class="demo-card" aria-label="Ejemplo de un día de menú">
+        <div class="demo-head">
+          <div>
+            <p class="demo-tag">Ejemplo · Lunes</p>
+            <p class="demo-title">3 comidas para 2 personas</p>
+          </div>
+          <p class="demo-total">6,97 US$</p>
+        </div>
+        <ul class="demo-meals">
+          <li><b class="dot sw-desayuno" aria-hidden="true"></b><span><small>Desayuno</small>Avena con plátano</span><em>10 min</em></li>
+          <li><b class="dot sw-almuerzo" aria-hidden="true"></b><span><small>Almuerzo</small>Arroz con pollo y zanahoria</span><em>30 min</em></li>
+          <li><b class="dot sw-cena" aria-hidden="true"></b><span><small>Cena</small>Sopa de verduras</span><em>25 min</em></li>
+        </ul>
+        <div class="demo-budget">
+          <div class="demo-budget-row"><span>Presupuesto usado</span><b>52 %</b></div>
+          <div class="demo-bar" aria-hidden="true"><i class="sw-desayuno" style="width:9%"></i><i class="sw-almuerzo" style="width:30%"></i><i class="sw-cena" style="width:13%"></i></div>
+        </div>
+        <figcaption class="demo-foot"><span>Lista de compras · 10 productos</span><span>Precios de tu país</span></figcaption>
+      </figure>
       </div>
     </section>
 
@@ -104,7 +127,7 @@
           <h1>¿Qué cocinamos esta semana?</h1>
           <p class="lede">Dinos cuánto puedes gastar, qué te gusta y qué no puedes comer. Gemini arma el desayuno, el almuerzo y la cena que elijas para cada día, con ingredientes, precios y pasos, sin pasarse del presupuesto.</p>
           <ul class="hero-facts">
-            <li><strong id="factMenus">0</strong><span>menús guardados</span></li>
+            <li><strong id="factMenus">0</strong><span id="factMenusTxt">menús guardados</span></li>
             <li><strong id="factPrecios">33</strong><span>precios de referencia</span></li>
             <li><strong>3</strong><span>comidas al día, a tu elección</span></li>
           </ul>
@@ -307,8 +330,12 @@
 
   <footer class="footer">
     <div class="wrap">
-      <p>Eco Menú · Recetas generadas con Gemini · Fotos de <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></p>
+      <div class="footer-brand">
+        <svg class="footer-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" /><circle cx="20" cy="20" r="11" /><path d="M7 33 33 7" /></svg>
+        <span>Eco Menú</span>
+      </div>
       <p class="hecha-por">Hecha por <a id="yourland" href="https://yourlandweb.com" target="_blank" rel="noopener">Yourland</a></p>
+      <p class="footer-credits">Recetas con Gemini · Precios de <a href="https://www.numbeo.com/food-prices/" target="_blank" rel="noopener noreferrer">Numbeo</a> · Fotos de <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></p>
     </div>
   </footer>
 

@@ -26,6 +26,7 @@
   --m-desayuno: #c07e00;  /* miel */
   --m-almuerzo: #9c3a1a;  /* óxido */
   --m-cena: #198a5a;      /* verde */
+  --card-edge: transparent; /* borde de tarjetas sobre la banda oscura (solo se ve en modo oscuro) */
   /* Banda oscura (igual en ambos temas) */
   --wood: #1e140e;
   --wood-2: #2c1e15;
@@ -47,7 +48,7 @@
   :root:not([data-theme="light"]) {
     --linen: #150e0a; --paper: #20160f; --ink: #f2e6d8; --muted: #bba590; --line: #3b2b20;
     --walnut: #e2bb8f; --accent: #e0935a; --accent-strong: #eba774; --accent-ink: #1d120a; --accent-soft: #3a2617;
-    --ok: #b3c46f; --warn: #e8b552; --danger: #f08b7f; --danger-soft: #3d1a16; --ticket: #261a12; --m-desayuno: #c38500; --m-almuerzo: #bf3f1d; --m-cena: #1e976a;
+    --ok: #b3c46f; --warn: #e8b552; --danger: #f08b7f; --danger-soft: #3d1a16; --ticket: #261a12; --m-desayuno: #c38500; --m-almuerzo: #bf3f1d; --m-cena: #1e976a; --card-edge: rgba(246, 235, 221, .16);
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
     color-scheme: dark;
   }
@@ -55,7 +56,7 @@
 :root[data-theme="dark"] {
   --linen: #150e0a; --paper: #20160f; --ink: #f2e6d8; --muted: #bba590; --line: #3b2b20;
   --walnut: #e2bb8f; --accent: #e0935a; --accent-strong: #eba774; --accent-ink: #1d120a; --accent-soft: #3a2617;
-  --ok: #b3c46f; --warn: #e8b552; --danger: #f08b7f; --danger-soft: #3d1a16; --ticket: #261a12; --m-desayuno: #c38500; --m-almuerzo: #bf3f1d; --m-cena: #1e976a;
+  --ok: #b3c46f; --warn: #e8b552; --danger: #f08b7f; --danger-soft: #3d1a16; --ticket: #261a12; --m-desayuno: #c38500; --m-almuerzo: #bf3f1d; --m-cena: #1e976a; --card-edge: rgba(246, 235, 221, .16);
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
   color-scheme: dark;
 }
@@ -400,7 +401,7 @@ textarea:focus { outline: 0; border-color: var(--accent); }
 .alert-info { background: var(--accent-soft); color: var(--walnut); }
 
 /* Tira de días */
-.day-strip { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 10px; scrollbar-width: thin; }
+.day-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 10px; scrollbar-width: thin; }
 .day-tab {
   flex: 0 0 180px; scroll-snap-align: start; display: grid; text-align: left; padding: 0; border-radius: 16px; overflow: hidden; cursor: pointer;
   border: 2px solid transparent; background: var(--paper); box-shadow: var(--shadow); transition: transform .25s var(--ease), border-color .2s;
@@ -410,7 +411,7 @@ textarea:focus { outline: 0; border-color: var(--accent); }
 .day-tab-img { aspect-ratio: 16 / 10; background: var(--wood-2) center / cover no-repeat; max-width: 100%; }
 .day-tab-body { padding: 10px 12px 12px; display: grid; gap: 2px; }
 .day-tab-day { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
-.day-tab { flex-basis: 210px; }
+.day-tab { min-width: 0; }
 .day-tab-meals { display: grid; gap: 3px; margin: 2px 0 4px; }
 .day-tab-meals > span { display: flex; align-items: baseline; gap: 6px; font-weight: 600; font-size: var(--t-xs); line-height: 1.3; min-width: 0; }
 .day-tab-meals > span .dot { transform: translateY(-1px); }
@@ -721,3 +722,47 @@ dialog::backdrop { background: rgba(20, 12, 8, .6); backdrop-filter: blur(4px); 
 .pais-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .pais-select { min-height: 40px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--paper); padding: 0 14px; font-weight: 600; cursor: pointer; color: var(--ink); }
 .pais-select:focus { outline: 0; border-color: var(--accent); }
+
+/* =====================================================================
+   Pulido final
+   ===================================================================== */
+/* Portada: dos columnas alineadas con el resto de la página */
+.landing .landing-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; padding-block: 56px 64px; }
+.landing .landing-inner { padding-block: 0; max-width: 40rem; }
+@media (min-width: 920px) {
+  .landing .landing-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center; gap: 56px; padding-block: 80px 88px; }
+}
+
+/* Muestra de un menú en la portada */
+.demo-card {
+  margin: 0; justify-self: center; width: 100%; max-width: 420px; display: grid; gap: 16px;
+  background: var(--paper); color: var(--ink); border-radius: 22px; padding: 22px; box-shadow: 0 30px 70px rgba(0,0,0,.4);
+}
+.demo-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding-bottom: 14px; border-bottom: 1px dashed var(--line); }
+.demo-tag { font-size: .7rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.demo-title { font-family: var(--f-display); font-size: 1.3rem; margin-top: 2px; }
+.demo-total { font-family: var(--f-mono); font-weight: 500; color: var(--walnut); white-space: nowrap; }
+.demo-meals { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.demo-meals li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--linen); }
+.demo-meals .dot { width: 10px; height: 10px; }
+.demo-meals span { display: grid; font-weight: 600; font-size: var(--t-sm); }
+.demo-meals small { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.demo-meals em { font-style: normal; font-family: var(--f-mono); font-size: var(--t-xs); color: var(--muted); }
+.demo-budget { display: grid; gap: 6px; }
+.demo-budget-row { display: flex; justify-content: space-between; font-size: var(--t-xs); color: var(--muted); }
+.demo-budget-row b { font-family: var(--f-mono); color: var(--ok); }
+.demo-bar { display: flex; gap: 2px; height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.demo-bar i { display: block; height: 100%; }
+.demo-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: var(--t-xs); font-weight: 600; color: var(--walnut); }
+@media (max-width: 640px) { .demo-card { padding: 18px; } }
+
+/* Pie de página */
+.footer { padding-block: 32px; }
+.footer .wrap { display: grid; justify-items: center; gap: 8px; }
+.footer-brand { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-display); font-size: 1.15rem; color: var(--ink); }
+.footer-mark { width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 2.2; }
+.footer-credits { font-size: var(--t-xs); color: var(--muted); }
+.footer-credits a { color: inherit; }
+
+/* Tarjetas sobre la banda oscura: un borde suave las separa del fondo en modo oscuro */
+.wizard, .demo-card { border: 1px solid var(--card-edge); }
