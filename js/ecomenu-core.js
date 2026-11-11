@@ -11,6 +11,21 @@
       ? PRECIOS_REFERENCIA // eslint-disable-line no-undef
       : require("./precios.js").PRECIOS_REFERENCIA;
 
+  const PAIS =
+    typeof PRECIOS_PAIS !== "undefined"
+      ? { PRECIOS_PAIS, PRECIOS_PAIS_FECHA } // eslint-disable-line no-undef
+      : require("./precios-pais.js");
+
+  /** País por defecto para cada moneda (Venezuela usa dólares, así que se elige aparte). */
+  const PAIS_POR_MONEDA = { USD: "US", EUR: "ES", MXN: "MX", ARS: "AR", COP: "CO", CLP: "CL", PEN: "PE", BOB: "BO", UYU: "UY", GTQ: "GT", DOP: "DO" };
+  const PAISES = Object.keys(PAIS.PRECIOS_PAIS);
+
+  /** Fuente de precios reales de un país: { codigo, pais, url, precios, moneda, fecha } o null. */
+  function fuentePrecios(codigo) {
+    const f = PAIS.PRECIOS_PAIS[codigo];
+    return f ? { codigo, ...f, fecha: PAIS.PRECIOS_PAIS_FECHA } : null;
+  }
+
   const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
   /**
@@ -110,7 +125,9 @@
 
   function sanearDatos(d = {}) {
     const diasSemana = sanearDiasSemana(d);
+    const moneda = /^[A-Z]{3}$/.test(d.moneda) ? d.moneda : "USD";
     return {
+      pais: PAISES.includes(d.pais) ? d.pais : (PAIS_POR_MONEDA[moneda] || "US"),
       presupuesto: Math.round(num(d.presupuesto, 0.01, 1e9, 0) * 100) / 100,
       moneda: /^[A-Z]{3}$/.test(d.moneda) ? d.moneda : "USD",
       diasSemana,
@@ -138,11 +155,11 @@
       "Eres Eco Menú, un cocinero casero experto en comida económica y sencilla de todos los días, y en optimizar presupuestos de compra.",
       "Tu tarea es crear un menú diario con una receta por cada comida pedida (desayuno, almuerzo y/o cena), ajustándote ESTRICTAMENTE al presupuesto y respetando SIEMPRE las alergias y restricciones.",
       "",
-      "BASE DE PRECIOS DE REFERENCIA (en USD, por la unidad indicada en cada clave):",
+      "BASE DE PRECIOS DE RESPALDO (en USD, por la unidad indicada en cada clave). Úsala solo para ingredientes que no estén en los PRECIOS REALES DEL PAÍS que vienen en el pedido:",
       JSON.stringify(PRECIOS, null, 2),
       "",
       "REGLAS OBLIGATORIAS:",
-      "1. Usa los precios de referencia para calcular el costo. Para ingredientes que no estén en la lista, estima un precio realista y económico.",
+      "1. FUENTES DE PRECIOS, en este orden: (a) los PRECIOS REALES DEL PAÍS del pedido (promedios de supermercado de Numbeo; si ya están en la moneda del presupuesto úsalos tal cual, si no conviértelos con un tipo de cambio aproximado actual); (b) para ingredientes que no estén ahí, estímalos en proporción a esos precios reales (ej. lentejas ≈ precio del arroz × 1,5; zanahoria ≈ precio de la papa); (c) la base de respaldo en USD solo si no hay forma de proporcionar.",
       "2. 'precio_estimado' es el costo proporcional de la cantidad usada (ej. 250 g de arroz a 1.50/kg = 0.38), no el del paquete completo.",
       "3. Si la moneda no es USD, convierte los precios con un tipo de cambio aproximado actual y expresa TODOS los montos en esa moneda.",
       "4. 'costo' de cada receta = suma de sus precio_estimado. 'costo_dia' = suma de los 'costo' de sus comidas. 'costo_total' = suma de todos los costo_dia.",
@@ -172,6 +189,13 @@
       `Alergias / restricciones (PROHIBIDAS): ${d.alergias.length ? d.alergias.join(", ") : "ninguna"}`
     ];
     if (d.notas) lineas.push(`Notas del usuario: ${d.notas}`);
+    const real = fuentePrecios(d.pais);
+    if (real) {
+      const conversion = real.moneda === d.moneda ? "ya están en la moneda del presupuesto" : `están en ${real.moneda}: conviértelos a ${d.moneda} con un tipo de cambio aproximado actual`;
+      lineas.push("", `País donde se compra: ${real.pais}.`,
+        `PRECIOS REALES DEL PAÍS (${real.pais}; promedio de supermercados según Numbeo, ${real.fecha}; ${conversion}). Unidades: leche por litro, pan por 500 g, huevos por docena, lechuga por unidad, el resto por kilo:`,
+        JSON.stringify(real.precios));
+    }
     lineas.push("");
     if (unaReceta) {
       lineas.push(`Genera exactamente 1 día con 'dia' = ${extra.diaNumero} y una sola comida de tipo "${comidas[0]}". Debe ser un platillo DISTINTO a estos: ${extra.evitar.join("; ") || "ninguno"}.`);
@@ -290,7 +314,7 @@
   }
 
   const api = {
-    MODELOS, COMIDAS, NOMBRES_DIAS, RESPONSE_SCHEMA, EcoError,
+    MODELOS, COMIDAS, NOMBRES_DIAS, RESPONSE_SCHEMA, EcoError, fuentePrecios, PAISES, PAIS_POR_MONEDA,
     sanearDatos, sanearComidas, sanearDiasSemana, sanearExtra, construirSystemPrompt, construirUserPrompt,
     parsearJSON, generarConGemini
   };

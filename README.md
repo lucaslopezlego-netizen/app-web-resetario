@@ -62,12 +62,20 @@ Con Supabase activo:
 
 Sin Supabase, la contraseña nunca se guarda: se guarda un hash PBKDF2-SHA256 con sal aleatoria.
 
+## De dónde sale cada cosa
+
+- **Precios:** promedios reales de supermercado de [Numbeo](https://www.numbeo.com/food-prices/) para 12 países (Argentina, Bolivia, Chile, Colombia, España, Estados Unidos, Guatemala, México, Perú, República Dominicana, Uruguay y Venezuela), en `js/precios-pais.js`. Eliges el país en "¿Dónde compras?" y la IA usa esos precios; lo que no está en la tabla lo estima en proporción. Venezuela publica en dólares. Para actualizar, vuelve a consultar la página de cada país (campo `url`).
+- **Recetas:** Gemini. La búsqueda en Google desde Gemini requiere activar facturación en Google AI Studio.
+- **Fotos:** 55 fotos de Unsplash en 12 tipos de plato (`js/fotos.js`); dentro de un menú cada receta recibe una foto distinta.
+- Los resultados muestran estas fuentes debajo del gráfico de costos.
+
 ## Estructura
 
 ```
 index.html              Interfaz
 css/styles.css          Estilos
-js/precios.js           PRECIOS_REFERENCIA (precios base en USD)
+js/precios.js           PRECIOS_REFERENCIA (precios de respaldo en USD)
+js/precios-pais.js      Precios reales por país (Numbeo)
 js/ecomenu-core.js      Prompts, esquema JSON y llamada a Gemini (navegador y servidor)
 js/fotos.js             Fotos de Unsplash según el tipo de plato
 js/compras.js           Lista de compras: pasillos, suma de cantidades y texto para copiar

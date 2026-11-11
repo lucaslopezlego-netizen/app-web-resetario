@@ -42,7 +42,15 @@
   /* ================================================================== */
   /* Estado                                                              */
   /* ================================================================== */
-  const datosIniciales = () => ({ presupuesto: 40, moneda: "USD", diasSemana: [0, 1, 2], personas: 2, comidas: ["almuerzo"], gustos: [], alergias: [], notas: "" });
+  /** País según el idioma del navegador (es-VE → Venezuela); si no, el de la moneda. */
+  function paisDelNavegador() {
+    const region = (navigator.languages || [navigator.language || ""]).map((l) => (l.split("-")[1] || "").toUpperCase()).find((r) => core.PAISES.includes(r));
+    return region || "US";
+  }
+  const datosIniciales = () => {
+    const pais = paisDelNavegador();
+    return { pais, presupuesto: 40, moneda: PRECIOS_PAIS[pais]?.moneda || "USD", diasSemana: [0, 1, 2], personas: 2, comidas: ["almuerzo"], gustos: [], alergias: [], notas: "" };
+  };
   const state = {
     usuario: null, us: null,          // persona con sesión y su almacén
     paso: 1, maxPaso: 1,
@@ -58,6 +66,7 @@
     base.comidas = core.sanearComidas(g.comidas || g.comida ? g : datosIniciales());
     base.diasSemana = core.sanearDiasSemana(g.diasSemana || g.dias ? g : datosIniciales());
     delete base.comida; delete base.dias;
+    if (!core.PAISES.includes(base.pais)) base.pais = g.moneda ? (core.PAIS_POR_MONEDA[g.moneda] || "US") : paisDelNavegador();
     state.datos = base;
   }
   const cfgLocal = window.ECOMENU_CONFIG || {};
@@ -209,9 +218,26 @@
   inpPres.addEventListener("input", () => sincronizarPresupuesto(inpPres.value, "input"));
   rango.addEventListener("input", () => sincronizarPresupuesto(rango.value, "rango"));
   $("#quickMontos").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) sincronizarPresupuesto(b.dataset.monto); });
+  // ¿Dónde compras? Los precios reales vienen del país; al cambiarlo se pone su moneda (Venezuela: dólares).
+  const selPais = $("#pais");
+  selPais.innerHTML = core.PAISES
+    .map((c) => [c, PRECIOS_PAIS[c].pais])
+    .sort((x, y) => x[1].localeCompare(y[1], "es"))
+    .map(([c, n]) => `<option value="${c}">${esc(n)}</option>`).join("");
+  selPais.addEventListener("change", () => {
+    state.datos.pais = selPais.value;
+    const moneda = PRECIOS_PAIS[selPais.value].moneda;
+    if (moneda !== state.datos.moneda) { selMoneda.value = moneda; selMoneda.dispatchEvent(new Event("change")); }
+    state.datos.pais = selPais.value; $("#pais").value = selPais.value;
+    guardarDatos();
+  });
+
   selMoneda.addEventListener("change", () => {
     // Al cambiar de moneda se convierte el monto de forma aproximada y se redondea a un número cómodo.
     const antes = state.datos.moneda, ahora = selMoneda.value;
+    if (core.PAIS_POR_MONEDA[antes] === state.datos.pais && core.PAIS_POR_MONEDA[ahora]) {
+      state.datos.pais = core.PAIS_POR_MONEDA[ahora]; $("#pais").value = state.datos.pais;
+    }
     const usd = state.datos.presupuesto * (A_USD[antes] || 1);
     state.datos.moneda = ahora;
     pintarRangoMoneda();
@@ -315,7 +341,7 @@
   function renderRevision() {
     const d = state.datos;
     const filas = [
-      ["Presupuesto", dinero(d.presupuesto, d.moneda), 1],
+      ["Presupuesto", `${dinero(d.presupuesto, d.moneda)} · ${PRECIOS_PAIS[d.pais]?.pais || ""}`, 1],
       ["Días", `${textoDias(d.diasSemana)} · ${d.personas} persona(s)`, 2],
       ["Comidas", listaNatural(d.comidas.map((c) => ETIQUETA[c].toLowerCase())).replace(/^./, (x) => x.toUpperCase()), 2],
       ["Gustos", d.gustos.join(", ") || "Sin preferencias", 3],
@@ -672,6 +698,7 @@
         <div class="bars-labels" aria-hidden="true">${plan.dias.map((_, i) => `<span>${diaPlan(i).slice(0, 3)}</span>`).join("")}</div>
       </div>
       ${plan.comentario ? `<p class="budget-note">${esc(plan.comentario)}</p>` : ""}
+      ${htmlFuentes(plan)}
       ${avisoIA}
       ${avisos.map(([t, m]) => `<p class="alert alert-${t}">${esc(m)}</p>`).join("")}`;
 
@@ -682,6 +709,20 @@
     }));
   }
 
+  /** De dónde sale cada cosa del menú: precios, recetas y fotos. */
+  function htmlFuentes(plan) {
+    const fp = core.fuentePrecios(plan.datos.pais || core.PAIS_POR_MONEDA[plan.datos.moneda]);
+    const precios = fp
+      ? `<a href="${fp.url}" target="_blank" rel="noopener">Numbeo · ${esc(fp.pais)}</a> (promedio de supermercados, ${esc(fp.fecha)}) y estimación proporcional para el resto`
+      : "precios de referencia en USD";
+    const recetas = plan.fuente === "demo" ? "recetas de ejemplo de Eco Menú" : `Gemini (${esc(plan.modelo || "Google")})`;
+    return `<dl class="fuentes">
+      <div><dt>Precios</dt><dd>${precios}</dd></div>
+      <div><dt>Recetas</dt><dd>${recetas}</dd></div>
+      <div><dt>Fotos</dt><dd><a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a> · una distinta por receta</dd></div>
+    </dl>`;
+  }
+
   /** Receta principal del día para la foto de la tarjeta: almuerzo, luego cena, luego desayuno. */
   const recetaPrincipal = (d) => d.comidas.find((c) => c.tipo === "almuerzo") || d.comidas.find((c) => c.tipo === "cena") || d.comidas[0];
 
@@ -689,7 +730,7 @@
     const plan = state.plan, mon = plan.datos.moneda;
     $("#tiraDias").innerHTML = plan.dias.map((d, i) => `
       <button type="button" class="day-tab" role="tab" id="tab-${i}" data-dia="${i}" aria-selected="${i === state.diaSel}" aria-controls="detalleDia" tabindex="${i === state.diaSel ? 0 : -1}">
-        <span class="day-tab-img" style="background-image:url('${fotoParaPlato(recetaPrincipal(d), i, 420)}')"></span>
+        <span class="day-tab-img" style="background-image:url('${fotoDeReceta(plan, i, d.comidas.indexOf(recetaPrincipal(d)), 420)}')"></span>
         <span class="day-tab-body">
           <span class="day-tab-day">${diaPlan(i)}</span>
           <span class="day-tab-meals">${d.comidas.map((c) => `<span><b class="dot sw-${c.tipo}" aria-hidden="true"></b>${esc(c.platillo)}</span>`).join("")}</span>
@@ -748,7 +789,7 @@
         </div>` : ""}
       </div>
       <div class="meal" id="recetaActual">
-        <header class="day-hero" style="background-image:url('${fotoParaPlato(r, di + ci, 1400)}')">
+        <header class="day-hero" style="background-image:url('${fotoDeReceta(plan, di, ci, 1400)}')">
           <p class="eyebrow">${ETIQUETA[r.tipo]} · ${diaPlan(di)}</p>
           <h3>${esc(r.platillo)}</h3>
           ${r.descripcion ? `<p>${esc(r.descripcion)}</p>` : ""}
@@ -828,6 +869,8 @@
     const total = totalPlan(plan), tengo = costoTengo();
     const fecha = new Date().toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" });
     const nItems = grupos.reduce((s, g) => s + g.items.length, 0);
+    const fpT = core.fuentePrecios(plan.datos.pais || core.PAIS_POR_MONEDA[plan.datos.moneda]);
+    $(".ticket-foot").textContent = fpT ? `Precios estimados con datos de Numbeo (${fpT.pais}, ${fpT.fecha}) · pueden variar en tu mercado` : "Precios estimados · pueden variar en tu mercado";
     $("#ticketSub").textContent = `${fecha} · ${plan.dias.length} día(s) · ${plan.datos.personas} persona(s) · ${nItems} productos`;
     let n = 0;
     $("#ticketLista").innerHTML = grupos.map((g) => `
@@ -1284,6 +1327,7 @@
     $("#menuNombre").textContent = u.nombre;
     $("#menuCorreo").textContent = u.correo;
     selMoneda.value = state.datos.moneda;
+    $("#pais").value = state.datos.pais;
     $("#notas").value = state.datos.notas || "";
     pintarRangoMoneda();
     sincronizarPresupuesto(state.datos.presupuesto);
