@@ -660,10 +660,11 @@
         </div>
         <div class="bars-grid">
           ${plan.dias.map((d, i) => {
-            const h = Math.max(6, (d.costo_dia / maxDia) * 78);
+            const h = Math.max(6, (d.costo_dia / maxDia) * 100);
             const detalle = d.comidas.map((c) => `${ETIQUETA[c.tipo]} ${dinero(c.costo, mon)}`).join(", ");
             return `<button type="button" class="bar ${i === state.diaSel ? "activo" : ""}" data-dia="${i}" style="--h:${h}px" aria-label="${diaPlan(i)}: ${esc(dinero(d.costo_dia, mon))} (${esc(detalle)})">
               <span class="bar-val">${esc(dinero(d.costo_dia, mon))}</span>
+              <span class="bar-tip" aria-hidden="true"><b>${diaPlan(i)} · ${esc(dinero(d.costo_dia, mon))}</b>${d.comidas.map((c) => `<span><i class="sw-${c.tipo}"></i>${ETIQUETA[c.tipo]}: ${esc(dinero(c.costo, mon))}</span>`).join("")}</span>
               <span class="stack" style="height:0">${d.comidas.map((c) => `<i class="sw-${c.tipo}" style="flex-grow:${Math.max(c.costo, 0.01)}"></i>`).join("")}</span>
             </button>`;
           }).join("")}
