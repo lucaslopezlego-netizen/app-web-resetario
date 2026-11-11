@@ -17,6 +17,8 @@ function esClaveSecreta(k) {
   return false;
 }
 
+const claveGemini = require("./_gemini-clave.js");
+
 module.exports = function handler(req, res) {
   const env = process.env;
   const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -29,6 +31,6 @@ module.exports = function handler(req, res) {
   res.setHeader("Cache-Control", "public, max-age=300");
   res.status(200).json({
     supabase: url && anonKey ? { url, anonKey } : null,
-    gemini: !!env.GEMINI_API_KEY
+    gemini: !!claveGemini()
   });
 };

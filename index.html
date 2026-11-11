@@ -332,38 +332,6 @@
     </div>
   </dialog>
 
-  <!-- ================= Ajustes ================= -->
-  <dialog class="sheet" id="ajustes" aria-labelledby="ajustesTitulo">
-    <form method="dialog" class="sheet-inner" id="formAjustes">
-      <div class="sheet-head">
-        <h2 id="ajustesTitulo">Conexión con Gemini</h2>
-        <button type="submit" value="cancel" class="icon-btn" aria-label="Cerrar ajustes">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-        </button>
-      </div>
-      <p class="muted" id="ajustesOrigen"></p>
-      <label class="label-strong" for="apiKey">API Key de Google AI Studio</label>
-      <div class="key-row">
-        <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="Pega tu clave aquí" />
-        <button type="button" class="btn btn-quiet btn-sm" id="btnVerKey">Mostrar</button>
-      </div>
-      <label class="label-strong" for="modelo">Modelo</label>
-      <select id="modelo">
-        <option value="auto">Automático (recomendado)</option>
-        <option value="gemini-3.5-flash">gemini-3.5-flash</option>
-        <option value="gemini-3.8-flash">gemini-3.8-flash</option>
-        <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
-        <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
-      </select>
-      <p class="hint">En automático, si un modelo está saturado se prueba el siguiente.</p>
-      <label class="check"><input type="checkbox" id="recordarKey" /><span>Recordar la clave en este navegador</span></label>
-      <label class="check"><input type="checkbox" id="modoDemo" /><span>Usar recetas de ejemplo (sin IA)</span></label>
-      <div class="sheet-actions">
-        <button type="button" class="btn btn-quiet" id="btnBorrarKey">Borrar clave</button>
-        <button type="submit" value="save" class="btn btn-primary" id="btnGuardarAjustes">Guardar</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- ================= Cuenta: crear / iniciar sesión ================= -->
   <dialog class="sheet auth" id="auth" aria-labelledby="authTitulo">
@@ -494,10 +462,6 @@
         <div id="misMenus" aria-labelledby="misMenusLabel"></div>
 
         <p class="drawer-label">Cuenta</p>
-        <button type="button" class="drawer-link" id="btnAjustes" aria-haspopup="dialog">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
-          <span>Ajustes de la IA</span>
-        </button>
         <button type="button" class="drawer-link drawer-link-danger" id="btnSalir">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
           <span>Cerrar sesión</span>

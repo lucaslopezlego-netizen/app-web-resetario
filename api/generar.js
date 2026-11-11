@@ -7,6 +7,7 @@
  * Respuesta: { plan, modelo } o { error }
  */
 const core = require("../js/ecomenu-core.js");
+const claveGemini = require("./_gemini-clave.js");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -14,7 +15,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Usa POST." });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = claveGemini();
   if (!apiKey) {
     return res.status(500).json({ error: "Falta la variable GEMINI_API_KEY en la configuración de Vercel." });
   }

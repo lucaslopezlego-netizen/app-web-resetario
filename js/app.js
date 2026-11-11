@@ -61,11 +61,10 @@
     state.datos = base;
   }
   const cfgLocal = window.ECOMENU_CONFIG || {};
-  const ajustes = {
-    key: store.get(K.key, ""),
-    modelo: store.get(K.modelo, cfgLocal.modelo || "auto"),
-    demo: store.get(K.demo, false)
-  };
+  // Ya no hay "Ajustes de la IA": la app siempre usa Gemini. Se borra lo que hubiera quedado guardado de antes
+  // (una clave vieja o la opción de recetas de ejemplo) para que nadie quede atascado en recetas de ejemplo.
+  [K.key, K.modelo, K.demo].forEach((k) => store.del(k));
+  const ajustes = { key: "", modelo: cfgLocal.modelo || "auto", demo: false };
   const claveActiva = () => (ajustes.key || cfgLocal.apiKey || "").trim();
   const enServidorWeb = () => /^https?:$/.test(location.protocol) && !state.sinServidor;
   const kIng = (d, c, i) => `${d}.${c}.${i}`;
@@ -629,12 +628,12 @@
     if (plan.fuente === "demo") {
       const iaDisponible = !!claveActiva() || EcoCuentas.geminiEnServidor === true;
       let motivo;
-      if (ajustes.demo) motivo = "Este menú usa recetas de ejemplo porque está activada la opción «Usar recetas de ejemplo» en Ajustes.";
+      if (ajustes.demo) motivo = "Este menú usa recetas de ejemplo.";
       else if (iaDisponible) motivo = "Este menú se generó con recetas de ejemplo, antes de que la IA estuviera conectada. La IA ya está lista.";
       else if ((plan.motivoDemo || state.motivoDemo) === "vercel-sin-clave" || EcoCuentas.geminiEnServidor === false)
         motivo = `Este menú usa recetas de ejemplo porque el proyecto de Vercel donde está publicada esta página (${location.hostname}) no tiene la variable GEMINI_API_KEY. Agrégala en Vercel → Settings → Environment Variables y vuelve a publicar.`;
-      else motivo = "Este menú usa recetas de ejemplo porque no hay una clave de Gemini. Pégala en Menú → Ajustes de la IA y marca «Recordar la clave».";
-      avisoIA = `<div class="alert alert-info alert-accion"><p>${esc(motivo)}</p>${ajustes.demo || iaDisponible
+      else motivo = "Este menú usa recetas de ejemplo porque la IA no estaba disponible. Vuelve a generarlo en un momento.";
+      avisoIA = `<div class="alert alert-info alert-accion"><p>${esc(motivo)}</p>${true
         ? `<button type="button" class="btn btn-primary btn-sm" data-accion="generar-ia">Generar este menú con IA</button>` : ""}</div>`;
     }
     if (gastar > pres) avisos.push(["danger", "El menú supera tu presupuesto. Marca lo que ya tienes en casa, cambia alguna receta o reduce días, comidas o personas."]);
@@ -971,45 +970,6 @@
         $("#btnTimer").textContent = "Reiniciar"; sonar(); toast("¡Tiempo cumplido!");
       }
     }, 1000);
-  });
-
-  /* ================================================================== */
-  /* Ajustes                                                             */
-  /* ================================================================== */
-  const dlgAjustes = $("#ajustes");
-  $("#btnAjustes").addEventListener("click", () => {
-    if (dlgMenu.open) dlgMenu.close();
-    $("#apiKey").value = ajustes.key;
-    $("#apiKey").type = "password"; $("#btnVerKey").textContent = "Mostrar";
-    $("#modelo").value = [...$("#modelo").options].some((o) => o.value === ajustes.modelo) ? ajustes.modelo : "auto";
-    $("#recordarKey").checked = !!store.get(K.key, "");
-    $("#modoDemo").checked = ajustes.demo;
-    let origen;
-    if (cfgLocal.apiKey) origen = "Ya hay una clave cargada desde js/config.local.js. Si escribes otra aquí, se usará esa en su lugar.";
-    else if (enServidorWeb()) origen = "Sin clave aquí, la app usa la clave guardada en el servidor (Vercel), si existe.";
-    else origen = "Pega tu clave de Google AI Studio para generar recetas con Gemini.";
-    $("#ajustesOrigen").textContent = origen;
-    dlgAjustes.showModal();
-  });
-  $("#btnVerKey").addEventListener("click", () => {
-    const ver = $("#apiKey").type === "password";
-    $("#apiKey").type = ver ? "text" : "password";
-    $("#btnVerKey").textContent = ver ? "Ocultar" : "Mostrar";
-  });
-  $("#btnBorrarKey").addEventListener("click", () => {
-    $("#apiKey").value = ""; ajustes.key = ""; store.del(K.key); actualizarConexion();
-    toast("Clave borrada de este navegador");
-  });
-  dlgAjustes.addEventListener("close", () => {
-    if (dlgAjustes.returnValue !== "save") return;
-    ajustes.key = $("#apiKey").value.trim();
-    ajustes.modelo = $("#modelo").value;
-    ajustes.demo = $("#modoDemo").checked;
-    if ($("#recordarKey").checked && ajustes.key) store.set(K.key, ajustes.key); else store.del(K.key);
-    store.set(K.modelo, ajustes.modelo); store.set(K.demo, ajustes.demo);
-    state.sinServidor = false;
-    actualizarConexion();
-    toast("Ajustes guardados");
   });
 
   /* ================================================================== */
